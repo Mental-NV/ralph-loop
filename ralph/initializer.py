@@ -14,6 +14,10 @@ from typing import Any, Dict
 
 from ralph.providers import get_provider, list_available_providers
 
+# ANSI color codes for output
+DIM = "\033[2m"
+RESET = "\033[0m"
+
 
 class BacklogInitializer:
     """Handles backlog initialization from user prompts."""
@@ -199,20 +203,81 @@ class BacklogInitializer:
             temp_output.write_text(json.dumps(mock_data, indent=2), encoding='utf-8')
             return json.dumps(mock_data)
 
+        # Get progress renderer if available
+        renderer_cmd = self.provider.get_progress_renderer(self.project_dir)
+
         try:
-            result = subprocess.run(
-                cmd,
-                cwd=self.project_dir,
-                capture_output=True,
-                text=True,
-                timeout=300  # 5 minute timeout
-            )
+            # Always capture output to a file for later parsing
+            raw_output_file = self.debug_dir / f"raw-output-{self._timestamp()}.txt"
 
-            if result.returncode != 0:
-                error_msg = result.stderr if result.stderr else "Unknown error"
-                raise RuntimeError(f"Provider failed with exit code {result.returncode}: {error_msg}")
+            if renderer_cmd:
+                # Run with renderer for real-time visualization
+                print(f"{DIM}[info] raw log: {raw_output_file}{RESET}\n")
 
-            return result.stdout
+                with open(raw_output_file, 'w', encoding='utf-8') as raw_f:
+                    agent_proc = subprocess.Popen(
+                        cmd,
+                        cwd=self.project_dir,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True
+                    )
+
+                    renderer_proc = subprocess.Popen(
+                        renderer_cmd,
+                        stdin=subprocess.PIPE,
+                        stdout=sys.stdout,
+                        stderr=sys.stderr,
+                        cwd=self.project_dir,
+                        text=True
+                    )
+
+                    # Tee the output: send to both renderer and file
+                    if agent_proc.stdout:
+                        for line in agent_proc.stdout:
+                            raw_f.write(line)
+                            raw_f.flush()
+                            if renderer_proc.stdin:
+                                try:
+                                    renderer_proc.stdin.write(line)
+                                    renderer_proc.stdin.flush()
+                                except BrokenPipeError:
+                                    break
+
+                    # Close renderer stdin
+                    if renderer_proc.stdin:
+                        renderer_proc.stdin.close()
+
+                    # Wait for both processes
+                    renderer_proc.wait()
+                    agent_proc.wait()
+
+                    if agent_proc.returncode != 0:
+                        stderr = agent_proc.stderr.read() if agent_proc.stderr else ""
+                        if stderr:
+                            raise RuntimeError(f"Provider failed: {stderr}")
+                        raise RuntimeError(f"Provider failed with exit code {agent_proc.returncode}")
+
+                # Read the saved output
+                return raw_output_file.read_text(encoding='utf-8')
+
+            else:
+                # No renderer, run directly and save output
+                result = subprocess.run(
+                    cmd,
+                    cwd=self.project_dir,
+                    capture_output=True,
+                    text=True,
+                    timeout=300  # 5 minute timeout
+                )
+
+                if result.returncode != 0:
+                    error_msg = result.stderr if result.stderr else "Unknown error"
+                    raise RuntimeError(f"Provider failed with exit code {result.returncode}: {error_msg}")
+
+                # Save output to file
+                raw_output_file.write_text(result.stdout, encoding='utf-8')
+                return result.stdout
 
         except subprocess.TimeoutExpired:
             raise RuntimeError(
