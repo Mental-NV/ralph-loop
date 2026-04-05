@@ -207,12 +207,21 @@ class BacklogOrchestrator:
                 break
 
     def mark_item_done(self, backlog: Dict[str, Any], item_id: str) -> None:
-        """Mark item as done and set completedAt timestamp."""
+        """Mark item as done, set completedAt timestamp, and mark all deliverables/exit criteria as done."""
         items = backlog.get('items', [])
         for item in items:
             if item['id'] == item_id:
                 item['status'] = 'done'
                 item['completedAt'] = datetime.now(timezone.utc).isoformat()
+
+                # Mark all deliverables as done
+                for deliverable in item.get('deliverables', []):
+                    deliverable['done'] = True
+
+                # Mark all exit criteria as done
+                for criterion in item.get('exitCriteria', []):
+                    criterion['done'] = True
+
                 break
 
     def run_validation_commands(self, item: Dict[str, Any]) -> bool:
