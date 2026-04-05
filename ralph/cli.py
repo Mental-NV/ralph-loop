@@ -74,6 +74,12 @@ def main():
         action='version',
         version='%(prog)s 1.0.0'
     )
+    parser.add_argument(
+        '--init',
+        type=str,
+        metavar='PROMPT',
+        help='Initialize backlog from prompt (e.g., "Build a web scraper in Python")'
+    )
 
     args = parser.parse_args()
 
@@ -87,6 +93,42 @@ def main():
         else:
             print("No providers are available on this system")
         sys.exit(0)
+
+    # Init mode - initialize backlog from prompt
+    if args.init:
+        from ralph.initializer import BacklogInitializer
+
+        # Resolve project directory
+        if args.project:
+            project_dir = Path(args.project).resolve()
+        else:
+            project_dir = Path.cwd()
+
+        if not project_dir.exists():
+            print(f"Error: Project directory does not exist: {project_dir}", file=sys.stderr)
+            sys.exit(1)
+
+        if not project_dir.is_dir():
+            print(f"Error: Project path is not a directory: {project_dir}", file=sys.stderr)
+            sys.exit(1)
+
+        # Resolve backlog path
+        if args.backlog:
+            backlog_path = Path(args.backlog).resolve()
+        else:
+            backlog_path = project_dir / "docs" / "backlog.json"
+
+        # Create initializer
+        initializer = BacklogInitializer(
+            project_dir=project_dir,
+            backlog_path=backlog_path,
+            provider=args.provider,
+            dry_run=args.dry_run
+        )
+
+        # Run initialization
+        exit_code = initializer.initialize(args.init)
+        sys.exit(exit_code)
 
     # Resolve project directory
     if args.project:

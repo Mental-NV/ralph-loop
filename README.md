@@ -6,6 +6,7 @@ Ralph Loop is a standalone tool that executes backlog items autonomously using A
 
 ## Features
 
+- **Backlog initialization**: Generate backlog from natural language prompts using AI
 - **Multi-provider support**: Qwen (local), Claude Code (CLI), Codex (API)
 - **JSON-driven orchestration**: Backlog items defined in `docs/backlog.json`
 - **Automatic validation**: Schema validation and semantic checks before execution
@@ -38,6 +39,41 @@ pipx install -e .
 
 ## Usage
 
+### Quick Start: Initialize a new project
+
+The fastest way to get started is to initialize a backlog from a natural language prompt:
+
+```bash
+cd ~/projects/my-new-project
+git init
+ralph --init "Build a web scraper in Python that extracts article titles from news sites"
+```
+
+This will:
+1. Invoke an AI agent to generate a comprehensive roadmap
+2. Create `docs/backlog.json` with structured milestones
+3. Validate the generated backlog
+4. Display a summary of milestones
+
+Then run Ralph Loop to execute the backlog:
+
+```bash
+ralph
+```
+
+### Initialize with different providers
+
+```bash
+# Use Claude Code for roadmap generation
+ralph --init "Build a REST API with FastAPI" --provider claude
+
+# Use Codex
+ralph --init "Create a CLI tool for file management" --provider codex
+
+# Preview without creating files
+ralph --init "Build a todo app" --dry-run
+```
+
 ### Basic usage
 
 Run Ralph Loop in a project directory with `docs/backlog.json`:
@@ -58,6 +94,9 @@ ralph --project ~/projects/your-project
 ### Command-line options
 
 ```bash
+# Initialize backlog from prompt
+ralph --init "Project description"
+
 # Validate backlog without executing
 ralph --validate-only
 
@@ -250,6 +289,94 @@ Run validation without executing:
 ralph --validate-only
 ```
 
+## Backlog Initialization with `--init`
+
+The `--init` command generates a comprehensive project roadmap from a natural language prompt. This feature uses AI agents to break down your project into structured milestones suitable for autonomous implementation.
+
+### How it works
+
+1. You provide a project description
+2. Ralph Loop invokes an AI agent (Qwen, Claude Code, or Codex)
+3. The agent generates a roadmap with milestones, deliverables, and exit criteria
+4. Ralph Loop transforms the response into a valid `backlog.json`
+5. The backlog is validated and saved to `docs/backlog.json`
+
+### Usage examples
+
+```bash
+# Web application
+ralph --init "Build a blog platform with user authentication and markdown support"
+
+# CLI tool
+ralph --init "Create a command-line tool for managing TODO lists with SQLite storage"
+
+# Library
+ralph --init "Develop a Python library for parsing and validating JSON schemas"
+
+# Data pipeline
+ralph --init "Build an ETL pipeline that extracts data from CSV files and loads into PostgreSQL"
+
+# With specific provider
+ralph --init "Build a REST API with FastAPI" --provider claude
+
+# Preview without creating files
+ralph --init "Build a calculator app" --dry-run
+```
+
+### Tips for effective prompts
+
+**Be specific about technology:**
+- ✓ "Build a web scraper in Python using BeautifulSoup"
+- ✗ "Build a web scraper"
+
+**Mention key requirements:**
+- ✓ "Create a REST API with authentication, rate limiting, and PostgreSQL"
+- ✗ "Create an API"
+
+**Include testing requirements:**
+- ✓ "Build a CLI tool with unit tests and integration tests"
+- ✗ "Build a CLI tool"
+
+**Specify the scope:**
+- ✓ "Build a minimal viable product for a todo app with basic CRUD operations"
+- ✗ "Build a todo app with every feature imaginable"
+
+### What gets generated
+
+Each milestone includes:
+- **Title**: Clear, actionable milestone name
+- **Why**: Rationale for the milestone
+- **Priority**: P0 (foundation), P1 (core), P2 (enhancements), P3 (polish)
+- **Dependencies**: Which milestones must complete first
+- **Deliverables**: Concrete outputs (files, functions, tests)
+- **Exit Criteria**: How to verify completion
+- **Risks**: Potential challenges and mitigations
+- **Validation Commands**: Shell commands to verify the milestone
+
+### Customizing generated backlogs
+
+After generation, you can manually edit `docs/backlog.json` to:
+- Adjust priorities
+- Add or remove milestones
+- Modify deliverables and exit criteria
+- Add validation commands
+- Specify dependencies
+
+Then validate your changes:
+
+```bash
+ralph --validate-only
+```
+
+### Debug output
+
+All initialization attempts save debug information to `logs/ralph/init/`:
+- `prompt-*.txt`: The prompt sent to the agent
+- `response-*.txt`: The raw agent response
+- `failed-parse-*.txt`: Responses that failed to parse (if any)
+
+This helps troubleshoot issues with agent responses or parsing.
+
 ## Troubleshooting
 
 ### "Backlog not found"
@@ -258,6 +385,12 @@ Ensure `docs/backlog.json` exists in the project directory:
 
 ```bash
 ls docs/backlog.json
+```
+
+Or use `--init` to generate one:
+
+```bash
+ralph --init "Your project description"
 ```
 
 Or specify a custom location:
