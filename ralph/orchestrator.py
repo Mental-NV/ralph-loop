@@ -206,6 +206,15 @@ class BacklogOrchestrator:
                 item['startedAt'] = datetime.now(timezone.utc).isoformat()
                 break
 
+    def mark_work_complete(self, backlog: Dict[str, Any], item_id: str) -> None:
+        """Mark work phase complete and transition to ready_for_validation."""
+        items = backlog.get('items', [])
+        for item in items:
+            if item['id'] == item_id:
+                item['status'] = 'ready_for_validation'
+                item['workCompletedAt'] = datetime.now(timezone.utc).isoformat()
+                break
+
     def mark_item_done(self, backlog: Dict[str, Any], item_id: str) -> None:
         """Mark item as done, set completedAt timestamp, and mark all deliverables/exit criteria as done."""
         items = backlog.get('items', [])
@@ -224,8 +233,16 @@ class BacklogOrchestrator:
 
                 break
 
+    def is_cleanup_command(self, cmd: str) -> bool:
+        """Identify cleanup commands that shouldn't block completion."""
+        cleanup_patterns = [
+            'pkill', 'killall', 'rm -rf', 'docker stop',
+            'docker rm', 'npm stop', 'dotnet stop', 'kill '
+        ]
+        return any(pattern in cmd for pattern in cleanup_patterns)
+
     def run_validation_commands(self, item: Dict[str, Any]) -> bool:
-        """Run validation commands for item. Returns True if all pass."""
+        """Run validation commands for item with graceful cleanup handling. Returns True if all critical commands pass."""
         validation = item.get('validation', {})
         commands = validation.get('commands', [])
 
@@ -233,32 +250,79 @@ class BacklogOrchestrator:
             print("No validation commands defined, skipping validation")
             return True
 
-        print(f"Running {len(commands)} validation command(s)...")
+        # Classify commands
+        critical_commands = []
+        cleanup_commands = []
 
-        for i, cmd in enumerate(commands, 1):
-            print(f"  [{i}/{len(commands)}] {cmd}")
+        for cmd in commands:
+            if self.is_cleanup_command(cmd):
+                cleanup_commands.append(cmd)
+            else:
+                critical_commands.append(cmd)
 
-            if self.dry_run:
-                print("  [DRY RUN] Would run command")
-                continue
+        # Run critical validation
+        if critical_commands:
+            print(f"Running {len(critical_commands)} critical validation command(s)...")
 
-            result = subprocess.run(
-                cmd,
-                shell=True,
-                cwd=self.project_dir,
-                capture_output=True,
-                text=True
-            )
+            for i, cmd in enumerate(critical_commands, 1):
+                print(f"  [{i}/{len(critical_commands)}] {cmd}")
 
-            if result.returncode != 0:
-                print(f"  FAILED (exit code {result.returncode})", file=sys.stderr)
-                if result.stdout:
-                    print("  stdout:", result.stdout[:500], file=sys.stderr)
-                if result.stderr:
-                    print("  stderr:", result.stderr[:500], file=sys.stderr)
-                return False
+                if self.dry_run:
+                    print("  [DRY RUN] Would run command")
+                    continue
 
-            print(f"  PASSED")
+                result = subprocess.run(
+                    cmd,
+                    shell=True,
+                    cwd=self.project_dir,
+                    capture_output=True,
+                    text=True
+                )
+
+                if result.returncode != 0:
+                    print(f"  FAILED (exit code {result.returncode})", file=sys.stderr)
+                    if result.stdout:
+                        print("  stdout:", result.stdout[:500], file=sys.stderr)
+                    if result.stderr:
+                        print("  stderr:", result.stderr[:500], file=sys.stderr)
+                    return False
+
+                print(f"  PASSED")
+
+        # Run cleanup commands (best-effort)
+        if cleanup_commands:
+            print(f"\nRunning {len(cleanup_commands)} cleanup command(s) (best-effort)...")
+
+            for i, cmd in enumerate(cleanup_commands, 1):
+                print(f"  [{i}/{len(cleanup_commands)}] {cmd}")
+
+                if self.dry_run:
+                    print("  [DRY RUN] Would run command")
+                    continue
+
+                try:
+                    result = subprocess.run(
+                        cmd,
+                        shell=True,
+                        cwd=self.project_dir,
+                        capture_output=True,
+                        text=True,
+                        timeout=10
+                    )
+
+                    if result.returncode != 0:
+                        print(f"  WARNING: Cleanup failed (non-critical, continuing)", file=sys.stderr)
+                        if result.stderr:
+                            print(f"  stderr: {result.stderr[:200]}", file=sys.stderr)
+                    else:
+                        print(f"  PASSED")
+
+                except subprocess.TimeoutExpired:
+                    print(f"  WARNING: Cleanup timed out (non-critical, continuing)", file=sys.stderr)
+                except KeyboardInterrupt:
+                    print(f"\n  WARNING: Cleanup interrupted by user (non-critical, continuing)", file=sys.stderr)
+                except Exception as e:
+                    print(f"  WARNING: Cleanup error: {e} (non-critical, continuing)", file=sys.stderr)
 
         return True
 
@@ -385,7 +449,7 @@ class BacklogOrchestrator:
 
     def run_loop(self, max_iterations: Optional[int] = None) -> int:
         """
-        Main execution loop.
+        Main execution loop with multi-phase execution.
         Returns exit code: 0 if all items done, 1 on error, 2 if work remains.
         """
         iteration = 0
@@ -407,17 +471,48 @@ class BacklogOrchestrator:
             # Load backlog
             backlog = self.load_backlog()
 
-            # Select next item
+            # Check for items in ready_for_validation status first
+            items = backlog.get('items', [])
+            ready_items = [i for i in items if i['status'] == 'ready_for_validation']
+
+            if ready_items:
+                # Process validation phase for ready items
+                item = ready_items[0]
+                print(f"\nValidation phase for: {item['title']}")
+                print(f"ID: {item['id']}")
+                print(f"Work completed at: {item.get('workCompletedAt', 'unknown')}")
+
+                # Run validation
+                if not self.run_validation_commands(item):
+                    print(f"\nValidation failed for {item['id']}", file=sys.stderr)
+                    return 1
+
+                # Mark item as done
+                backlog = self.load_backlog()  # Reload in case of external changes
+                self.mark_item_done(backlog, item['id'])
+                self.save_backlog(backlog)
+
+                print(f"\n✓ Completed: {item['title']}")
+
+                # Git push if auto-push enabled
+                if self.auto_push:
+                    if not self.check_git_clean():
+                        print("Working tree has uncommitted changes, skipping push")
+                    elif not self.git_push():
+                        print("Warning: git push failed", file=sys.stderr)
+
+                continue  # Process next iteration
+
+            # Select next item to start
             next_item = self.select_next_item(backlog)
 
             if not next_item:
-                # Check if any items are in_progress or ready_for_validation
-                items = backlog.get('items', [])
-                active = [i for i in items if i['status'] in ('in_progress', 'ready_for_validation')]
+                # Check if any items are in_progress
+                in_progress = [i for i in items if i['status'] == 'in_progress']
 
-                if active:
-                    print("\nNo new items to start, but active items remain:")
-                    for item in active:
+                if in_progress:
+                    print("\nNo new items to start, but items in progress remain:")
+                    for item in in_progress:
                         print(f"  - {item['id']}: {item['status']}")
                     return 2
 
@@ -437,31 +532,21 @@ class BacklogOrchestrator:
             self.mark_item_started(backlog, next_item['id'])
             self.save_backlog(backlog)
 
-            # Execute item
+            # Execute work phase
+            print(f"\nWork phase for: {next_item['title']}")
             success = self.execute_item(next_item)
 
             if not success:
-                print(f"\nExecution failed for {next_item['id']}", file=sys.stderr)
+                print(f"\nWork phase failed for {next_item['id']}", file=sys.stderr)
                 return 1
 
-            # Run validation
-            if not self.run_validation_commands(next_item):
-                print(f"\nValidation failed for {next_item['id']}", file=sys.stderr)
-                return 1
-
-            # Mark item as done
+            # Mark work complete and transition to ready_for_validation
             backlog = self.load_backlog()  # Reload in case of external changes
-            self.mark_item_done(backlog, next_item['id'])
+            self.mark_work_complete(backlog, next_item['id'])
             self.save_backlog(backlog)
 
-            print(f"\n✓ Completed: {next_item['title']}")
-
-            # Git push if auto-push enabled
-            if self.auto_push:
-                if not self.check_git_clean():
-                    print("Working tree has uncommitted changes, skipping push")
-                elif not self.git_push():
-                    print("Warning: git push failed", file=sys.stderr)
+            print(f"\n✓ Work phase complete: {next_item['title']}")
+            print(f"Status: ready_for_validation (will validate on next iteration)")
 
     def error(self, msg: str) -> None:
         """Print error and exit."""

@@ -81,6 +81,24 @@ def main():
         metavar='PROMPT',
         help='Initialize backlog from prompt (e.g., "Build a web scraper in Python")'
     )
+    parser.add_argument(
+        '--mark-complete',
+        type=str,
+        metavar='ITEM_ID',
+        help='Manually mark an item as complete (bypasses validation)'
+    )
+    parser.add_argument(
+        '--mark-ready',
+        type=str,
+        metavar='ITEM_ID',
+        help='Manually mark an item as ready for validation'
+    )
+    parser.add_argument(
+        '--reset-item',
+        type=str,
+        metavar='ITEM_ID',
+        help='Reset an item back to todo status'
+    )
 
     args = parser.parse_args()
 
@@ -94,6 +112,77 @@ def main():
         else:
             print("No providers are available on this system")
         sys.exit(0)
+
+    # Manual override commands
+    if args.mark_complete or args.mark_ready or args.reset_item:
+        # Resolve project directory
+        if args.project:
+            project_dir = Path(args.project).resolve()
+        else:
+            project_dir = Path.cwd()
+
+        if not project_dir.exists():
+            print(f"Error: Project directory does not exist: {project_dir}", file=sys.stderr)
+            sys.exit(1)
+
+        # Resolve backlog path
+        if args.backlog:
+            backlog_path = Path(args.backlog).resolve()
+        else:
+            backlog_path = project_dir / "docs" / "backlog.json"
+
+        if not backlog_path.exists():
+            print(f"Error: Backlog not found: {backlog_path}", file=sys.stderr)
+            sys.exit(1)
+
+        # Create orchestrator
+        orchestrator = BacklogOrchestrator(
+            project_dir=project_dir,
+            backlog_path=backlog_path,
+            provider=args.provider,
+            auto_push=False,
+            dry_run=False
+        )
+
+        backlog = orchestrator.load_backlog()
+
+        if args.mark_complete:
+            orchestrator.mark_item_done(backlog, args.mark_complete)
+            orchestrator.save_backlog(backlog)
+            print(f"✓ Marked {args.mark_complete} as complete")
+            sys.exit(0)
+
+        if args.mark_ready:
+            orchestrator.mark_work_complete(backlog, args.mark_ready)
+            orchestrator.save_backlog(backlog)
+            print(f"✓ Marked {args.mark_ready} as ready for validation")
+            sys.exit(0)
+
+        if args.reset_item:
+            items = backlog.get('items', [])
+            found = False
+            for item in items:
+                if item['id'] == args.reset_item:
+                    item['status'] = 'todo'
+                    # Clear timestamps
+                    item.pop('startedAt', None)
+                    item.pop('workCompletedAt', None)
+                    item.pop('completedAt', None)
+                    # Reset deliverables and exit criteria
+                    for deliverable in item.get('deliverables', []):
+                        deliverable['done'] = False
+                    for criterion in item.get('exitCriteria', []):
+                        criterion['done'] = False
+                    found = True
+                    break
+
+            if not found:
+                print(f"Error: Item not found: {args.reset_item}", file=sys.stderr)
+                sys.exit(1)
+
+            orchestrator.save_backlog(backlog)
+            print(f"✓ Reset {args.reset_item} to todo status")
+            sys.exit(0)
 
     # Init mode - initialize backlog from prompt
     if args.init:

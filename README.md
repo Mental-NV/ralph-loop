@@ -14,6 +14,8 @@ Ralph Loop is a standalone tool that executes backlog items autonomously using A
 - **Lock-based concurrency control**: Prevents multiple instances from running simultaneously
 - **Git integration**: Automatic commit and optional push after each milestone
 - **Dry-run mode**: Preview execution without making changes
+- **Resilient execution**: Multi-phase execution with graceful cleanup handling
+- **Manual overrides**: Commands to manually manage stuck items
 
 ## Installation
 
@@ -121,6 +123,70 @@ ralph --auto-push
 
 # Override backlog location
 ralph --backlog /path/to/custom-backlog.json
+
+# Manual override commands (for stuck items)
+ralph --mark-complete ITEM-ID      # Mark item as done (bypasses validation)
+ralph --mark-ready ITEM-ID         # Mark item as ready for validation
+ralph --reset-item ITEM-ID         # Reset item back to todo status
+```
+
+## Resilient Execution
+
+Ralph Loop uses multi-phase execution to handle transient failures gracefully:
+
+### Execution Phases
+
+1. **Work Phase** (`todo` → `in_progress`)
+   - Agent implements the milestone
+   - Creates code, tests, documentation
+   - On success: transitions to `ready_for_validation`
+
+2. **Validation Phase** (`ready_for_validation` → `done`)
+   - Runs validation commands
+   - Separates critical validation from cleanup
+   - On success: marks item as `done`
+
+### Graceful Cleanup Handling
+
+Validation commands are classified as either **critical** or **cleanup**:
+
+- **Critical commands**: Must pass for validation to succeed (e.g., `dotnet test`, `pytest`)
+- **Cleanup commands**: Best-effort, failures don't block completion (e.g., `pkill`, `docker stop`)
+
+Cleanup commands are automatically detected by pattern matching:
+- `pkill`, `killall`, `kill`
+- `docker stop`, `docker rm`
+- `npm stop`, `dotnet stop`
+- `rm -rf`
+
+Example validation with cleanup:
+```json
+{
+  "validation": {
+    "commands": [
+      "dotnet test",              // Critical - must pass
+      "curl http://localhost:5000", // Critical - must pass
+      "pkill -f 'dotnet run'"     // Cleanup - failure is non-blocking
+    ]
+  }
+}
+```
+
+If the cleanup command fails (e.g., process already stopped), the item is still marked as done.
+
+### Manual Recovery
+
+If an item gets stuck, use manual override commands:
+
+```bash
+# Item stuck in in_progress after agent crash
+ralph --mark-ready ITEM-ID
+
+# Item stuck in ready_for_validation, but work is actually done
+ralph --mark-complete ITEM-ID
+
+# Need to re-run an item from scratch
+ralph --reset-item ITEM-ID
 ```
 
 ## Project Requirements
