@@ -51,8 +51,9 @@ def main():
     parser.add_argument(
         '--max-iterations',
         type=int,
+        default=100,
         metavar='N',
-        help='Maximum number of loop iterations (for testing)'
+        help='Maximum number of loop iterations (default: 100)'
     )
     parser.add_argument(
         '--validate-only',
