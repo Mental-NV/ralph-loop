@@ -11,6 +11,46 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 
+def parse_stream_json_response(response: str) -> Optional[str]:
+    """
+    Extract text from stream-json format (one JSON object per line).
+
+    This handles responses from providers that use --output-format stream-json,
+    where each line is a JSON object with text_delta events.
+
+    Args:
+        response: Raw stream-json response
+
+    Returns:
+        Concatenated text content, or None if no text found
+    """
+    text_parts = []
+
+    for line in response.split('\n'):
+        line = line.strip()
+        if not line:
+            continue
+
+        try:
+            event = json.loads(line)
+
+            # Look for text_delta events
+            if (event.get('type') == 'stream_event' and
+                event.get('event', {}).get('type') == 'content_block_delta' and
+                event.get('event', {}).get('delta', {}).get('type') == 'text_delta'):
+
+                text = event['event']['delta'].get('text', '')
+                text_parts.append(text)
+
+        except json.JSONDecodeError:
+            continue
+
+    if text_parts:
+        return ''.join(text_parts)
+
+    return None
+
+
 def parse_json_response(response: str) -> Optional[Dict[str, Any]]:
     """
     Attempt to parse response as pure JSON.
@@ -183,9 +223,10 @@ def parse_roadmap_response(response: str, debug_dir: Path) -> Dict[str, Any]:
     Parse agent response using multi-tier strategy.
 
     Tries in order:
-    1. Direct JSON parsing
-    2. JSON extraction from markdown
-    3. Markdown structure parsing
+    1. Stream-json extraction (for --output-format stream-json)
+    2. Direct JSON parsing
+    3. JSON extraction from markdown
+    4. Markdown structure parsing
 
     Args:
         response: Raw agent response
@@ -197,6 +238,21 @@ def parse_roadmap_response(response: str, debug_dir: Path) -> Dict[str, Any]:
     Raises:
         ValueError: If all parsing strategies fail
     """
+    # Try tier 0: Stream-json extraction
+    # Check if response looks like stream-json (multiple lines with JSON objects)
+    if response.count('\n') > 10 and '"type":"stream_event"' in response:
+        extracted_text = parse_stream_json_response(response)
+        if extracted_text:
+            # Try parsing the extracted text as JSON
+            result = parse_json_response(extracted_text)
+            if result:
+                return result
+
+            # Try extracting JSON from markdown in the extracted text
+            result = extract_json_from_markdown(extracted_text)
+            if result:
+                return result
+
     # Try tier 1: Direct JSON
     result = parse_json_response(response)
     if result:
