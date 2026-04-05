@@ -91,9 +91,12 @@ class BacklogInitializer:
         self.debug_dir.mkdir(parents=True, exist_ok=True)
 
         try:
-            # Step 1: Build roadmap prompt
+            # Step 1: Build roadmap prompt with temp output file
             from ralph.prompts import build_roadmap_prompt
-            prompt = build_roadmap_prompt(user_prompt)
+
+            # Create temp file for agent to write to
+            temp_output = self.debug_dir / f"roadmap-{self._timestamp()}.json"
+            prompt = build_roadmap_prompt(user_prompt, str(temp_output))
 
             # Save prompt for debugging
             prompt_file = self.debug_dir / f"prompt-{self._timestamp()}.txt"
@@ -102,17 +105,27 @@ class BacklogInitializer:
 
             # Step 2: Invoke provider
             print(f"\nInvoking {self.provider_name} to generate roadmap...")
-            response = self._invoke_provider(prompt)
+            response = self._invoke_provider(prompt, temp_output)
 
             # Save response for debugging
             response_file = self.debug_dir / f"response-{self._timestamp()}.txt"
             response_file.write_text(response, encoding='utf-8')
             print(f"Received response (saved to {response_file})")
 
-            # Step 3: Parse response
-            print("\nParsing response...")
-            from ralph.parsers import parse_roadmap_response
-            parsed_data = parse_roadmap_response(response, self.debug_dir)
+            # Step 3: Read the generated file
+            print("\nReading generated roadmap file...")
+            if not temp_output.exists():
+                # Fallback: try parsing the response directly
+                print("Warning: Agent did not write to file, attempting to parse response...")
+                from ralph.parsers import parse_roadmap_response
+                parsed_data = parse_roadmap_response(response, self.debug_dir)
+            else:
+                # Read the file the agent created
+                import json
+                with open(temp_output, 'r', encoding='utf-8') as f:
+                    parsed_data = json.load(f)
+                print(f"Successfully read roadmap from {temp_output}")
+
             print(f"Parsed {len(parsed_data.get('items', []))} milestones")
 
             # Step 4: Transform to backlog
@@ -150,12 +163,13 @@ class BacklogInitializer:
             traceback.print_exc()
             return 1
 
-    def _invoke_provider(self, prompt: str) -> str:
+    def _invoke_provider(self, prompt: str, temp_output: Path) -> str:
         """
         Invoke provider and return response.
 
         Args:
             prompt: Prompt to send to provider
+            temp_output: Path where agent should write the roadmap
 
         Returns:
             Provider response text
@@ -167,8 +181,8 @@ class BacklogInitializer:
 
         if self.dry_run:
             print(f"[DRY RUN] Would run: {' '.join(cmd)}")
-            # Return minimal valid response for dry-run
-            return json.dumps({
+            # Create mock file for dry-run
+            mock_data = {
                 "version": "1.0.0",
                 "items": [
                     {
@@ -181,7 +195,9 @@ class BacklogInitializer:
                         "risks": []
                     }
                 ]
-            })
+            }
+            temp_output.write_text(json.dumps(mock_data, indent=2), encoding='utf-8')
+            return json.dumps(mock_data)
 
         try:
             result = subprocess.run(

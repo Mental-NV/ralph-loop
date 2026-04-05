@@ -6,17 +6,18 @@ Generates meta-prompts that instruct agents to produce structured roadmaps.
 """
 
 
-def build_roadmap_prompt(user_prompt: str) -> str:
+def build_roadmap_prompt(user_prompt: str, output_file: str) -> str:
     """
     Build meta-prompt for roadmap generation.
 
     Returns a prompt that instructs the agent to:
     1. Analyze the user's project description
     2. Break it into logical milestones
-    3. Output structured JSON matching backlog schema
+    3. Write structured JSON to a file
 
     Args:
         user_prompt: User's project description (e.g., "Build a web scraper in Python")
+        output_file: Path where the agent should write the roadmap JSON
 
     Returns:
         Formatted prompt for the agent
@@ -29,8 +30,10 @@ def build_roadmap_prompt(user_prompt: str) -> str:
 # Your Task
 Generate a comprehensive project roadmap with milestones suitable for autonomous implementation. Each milestone should be independently implementable by a frontier AI agent (Claude, Qwen, Codex).
 
+Write the roadmap as a JSON file to: {output_file}
+
 # Output Format
-Respond with ONLY a JSON object matching this exact structure (no markdown, no explanations):
+The JSON file must match this exact structure:
 
 {{
   "version": "1.0.0",
@@ -133,10 +136,11 @@ Respond with ONLY a JSON object matching this exact structure (no markdown, no e
 }}
 
 # Important Notes
-- Output ONLY the JSON object, no markdown code fences, no explanations
+- Write the JSON to the specified file path
 - Ensure all JSON is valid and properly escaped
 - Make milestones actionable and specific to the project request
 - Consider the target language, framework, and tools mentioned in the request
 - Design for autonomous implementation - agents won't ask clarifying questions
+- Use the write_file tool to create the JSON file
 
-Generate the roadmap now:"""
+Generate the roadmap and write it to the file now."""
