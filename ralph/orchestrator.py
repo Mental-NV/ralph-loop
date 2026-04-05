@@ -514,10 +514,6 @@ class BacklogOrchestrator:
             for criterion in exit_criteria:
                 status = "✓" if criterion.get('done') else "○"
                 lines.append(f"  {status} {criterion['text']}")
-            lines.append("")
-
-        # Add co-author
-        lines.append("Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>")
 
         return "\n".join(lines)
 

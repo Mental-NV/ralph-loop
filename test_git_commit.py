@@ -74,7 +74,6 @@ def test_git_commit():
         assert "Exit criteria:" in commit_message, "Missing exit criteria section"
         assert "✓ File exists" in commit_message, "Missing criterion 1"
         assert "✓ Tests pass" in commit_message, "Missing criterion 2"
-        assert "Co-Authored-By:" in commit_message, "Missing co-author"
 
         print("\n✓ Commit message format is correct")
 

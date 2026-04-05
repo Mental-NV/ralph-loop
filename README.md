@@ -201,7 +201,6 @@ After each item completes validation:
    - Item ID and title
    - List of deliverables (with completion status)
    - List of exit criteria (with completion status)
-   - Co-authored-by attribution
 
 Example commit message:
 ```
@@ -215,8 +214,6 @@ Deliverables:
 Exit criteria:
   ✓ All tests pass
   ✓ API responds correctly
-
-Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 ```
 
 ### Automatic Push
