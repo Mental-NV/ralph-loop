@@ -1,0 +1,355 @@
+# Ralph Loop
+
+Provider-agnostic orchestration loop for agent-driven development.
+
+Ralph Loop is a standalone tool that executes backlog items autonomously using AI agents. It supports multiple providers (Qwen, Claude Code, Codex) and orchestrates milestone-based development workflows.
+
+## Features
+
+- **Multi-provider support**: Qwen (local), Claude Code (CLI), Codex (API)
+- **JSON-driven orchestration**: Backlog items defined in `docs/backlog.json`
+- **Automatic validation**: Schema validation and semantic checks before execution
+- **Progress rendering**: Real-time progress visualization for supported providers
+- **Lock-based concurrency control**: Prevents multiple instances from running simultaneously
+- **Git integration**: Automatic commit and optional push after each milestone
+- **Dry-run mode**: Preview execution without making changes
+
+## Installation
+
+### Using pipx (recommended)
+
+```bash
+pipx install ~/projects/ralph-loop
+```
+
+### Using pip
+
+```bash
+pip install ~/projects/ralph-loop
+```
+
+### Development installation
+
+```bash
+git clone <repo-url>
+cd ralph-loop
+pipx install -e .
+```
+
+## Usage
+
+### Basic usage
+
+Run Ralph Loop in a project directory with `docs/backlog.json`:
+
+```bash
+cd ~/projects/your-project
+ralph
+```
+
+### Specify project directory
+
+Run Ralph Loop against a specific project from anywhere:
+
+```bash
+ralph --project ~/projects/your-project
+```
+
+### Command-line options
+
+```bash
+# Validate backlog without executing
+ralph --validate-only
+
+# Show next item to be executed
+ralph --show-next
+
+# List available providers
+ralph --list-providers
+
+# Use specific provider (default: qwen)
+ralph --provider claude
+ralph --provider codex
+
+# Dry-run mode (show what would be executed)
+ralph --dry-run
+
+# Limit iterations
+ralph --max-iterations 5
+
+# Auto-push commits to remote
+ralph --auto-push
+
+# Override backlog location
+ralph --backlog /path/to/custom-backlog.json
+```
+
+## Project Requirements
+
+Ralph Loop expects the following structure in target projects:
+
+```
+your-project/
+├── docs/
+│   └── backlog.json          # Required: backlog definition
+├── .git/                     # Required: git repository
+└── .ralph-loop.lock          # Created automatically during execution
+```
+
+### Backlog format
+
+The `docs/backlog.json` file defines milestones and their execution order:
+
+```json
+{
+  "items": [
+    {
+      "id": "ITEM-1",
+      "title": "Implement feature X",
+      "description": "Detailed description of the work",
+      "status": "todo",
+      "order": 1,
+      "dependsOn": [],
+      "deliverables": [
+        {
+          "id": "deliverable-1",
+          "description": "Create X.cs",
+          "done": false
+        }
+      ],
+      "exitCriteria": [
+        {
+          "id": "exit-1",
+          "description": "Tests pass",
+          "done": false
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Status values:**
+- `todo` - Not started
+- `in_progress` - Currently being executed
+- `ready_for_validation` - Implementation complete, awaiting validation
+- `done` - Completed and validated
+- `blocked` - Blocked by external dependency
+- `deferred` - Postponed
+- `cancelled` - Cancelled
+
+**Validation rules:**
+- All item IDs must be unique
+- All order values must be unique
+- Dependencies must reference existing items
+- At most one item can be active (`in_progress` or `ready_for_validation`)
+- Active items must have all dependencies completed
+- Done items must have all deliverables and exit criteria marked done
+- Blocked items must include `blockedReason`
+
+## Providers
+
+### Qwen (default)
+
+Local Qwen model via Ollama. Requires Ollama to be installed and running.
+
+```bash
+ralph --provider qwen
+```
+
+**Requirements:**
+- Ollama installed and running
+- Qwen model pulled: `ollama pull qwen2.5-coder:32b`
+
+**Features:**
+- Real-time progress rendering with qwen_renderer
+- Streaming output with syntax highlighting
+- Local execution (no API costs)
+
+### Claude Code
+
+Claude Code CLI tool. Requires Claude Code to be installed.
+
+```bash
+ralph --provider claude
+```
+
+**Requirements:**
+- Claude Code CLI installed
+- Valid Anthropic API key or OAuth token
+
+**Features:**
+- Best-effort progress rendering
+- High-quality code generation
+- Advanced reasoning capabilities
+
+### Codex
+
+OpenAI Codex API. Requires OpenAI API key.
+
+```bash
+ralph --provider codex
+```
+
+**Requirements:**
+- Valid OpenAI API key in `OPENAI_API_KEY` environment variable
+
+**Features:**
+- Best-effort progress rendering
+- Fast execution
+- API-based (no local setup)
+
+## Execution Flow
+
+1. **Validation**: Validate `docs/backlog.json` against bundled schema
+2. **Selection**: Find next `todo` item with all dependencies completed
+3. **Execution**: Run provider command with item context
+4. **Validation**: Check deliverables and exit criteria
+5. **Commit**: Create git commit with changes
+6. **Push** (optional): Push commit to remote if `--auto-push` enabled
+7. **Repeat**: Continue to next item until backlog is complete
+
+## Progress Rendering
+
+Ralph Loop provides real-time progress visualization for supported providers:
+
+- **Qwen**: Full progress rendering with syntax highlighting, streaming output, and status updates
+- **Claude Code**: Best-effort rendering (depends on Claude Code output format)
+- **Codex**: Best-effort rendering (depends on API response format)
+
+Progress logs are stored in `<project>/logs/ralph/qwen-stream/` for debugging.
+
+## Lock File
+
+Ralph Loop creates `.ralph-loop.lock` in the project directory to prevent concurrent execution. If the lock file exists and the process is still running, Ralph Loop will exit with an error.
+
+To manually remove a stale lock:
+
+```bash
+rm .ralph-loop.lock
+```
+
+## Validation
+
+Ralph Loop includes a comprehensive validator that checks:
+
+- **Schema validation**: JSON structure matches `backlog.schema.json`
+- **Unique IDs**: All item IDs are unique
+- **Unique orders**: All order values are unique
+- **Valid dependencies**: All dependency references exist
+- **No cycles**: Dependency graph is acyclic
+- **Active item limit**: At most one item is active
+- **Dependency readiness**: Active items have completed dependencies
+- **Done item completeness**: Done items have all deliverables/criteria marked done
+- **Blocked item reasons**: Blocked items include `blockedReason`
+- **Valid status transitions**: Status values are valid
+
+Run validation without executing:
+
+```bash
+ralph --validate-only
+```
+
+## Troubleshooting
+
+### "Backlog not found"
+
+Ensure `docs/backlog.json` exists in the project directory:
+
+```bash
+ls docs/backlog.json
+```
+
+Or specify a custom location:
+
+```bash
+ralph --backlog /path/to/backlog.json
+```
+
+### "Lock file exists"
+
+Another Ralph Loop instance is running, or a previous instance crashed. Check if the process is still running:
+
+```bash
+ps aux | grep ralph
+```
+
+If not, remove the stale lock:
+
+```bash
+rm .ralph-loop.lock
+```
+
+### "Provider not found"
+
+Ensure the provider is installed and available:
+
+- **Qwen**: `ollama list` should show qwen2.5-coder:32b
+- **Claude Code**: `claude --version` should work
+- **Codex**: `echo $OPENAI_API_KEY` should show your API key
+
+### "Validation failed"
+
+Run validation to see specific errors:
+
+```bash
+ralph --validate-only
+```
+
+Fix the reported issues in `docs/backlog.json` and try again.
+
+## Development
+
+### Running tests
+
+```bash
+pytest tests/
+```
+
+### Code structure
+
+- `ralph/cli.py` - Main CLI entry point
+- `ralph/orchestrator.py` - BacklogOrchestrator class
+- `ralph/providers.py` - Provider abstraction layer
+- `ralph/validator.py` - Backlog validation logic
+- `ralph/schemas/backlog.schema.json` - Bundled JSON schema
+- `ralph/renderers/qwen_renderer.py` - Qwen progress renderer
+- `ralph/renderers/simple_renderer.py` - Simple progress renderer
+
+### Adding a new provider
+
+1. Add provider class to `ralph/providers.py`:
+
+```python
+class MyProvider(Provider):
+    def build_command(self, item: Dict[str, Any], backlog_path: Path, project_dir: Path) -> List[str]:
+        return ["my-tool", "execute", str(backlog_path)]
+    
+    def get_progress_renderer(self, project_dir: Path) -> Optional[List[str]]:
+        return None  # or custom renderer command
+```
+
+2. Register provider in `PROVIDERS` dict:
+
+```python
+PROVIDERS = {
+    "qwen": QwenProvider(),
+    "claude": ClaudeCodeProvider(),
+    "codex": CodexProvider(),
+    "my-provider": MyProvider(),
+}
+```
+
+3. Test the new provider:
+
+```bash
+ralph --provider my-provider --dry-run
+```
+
+## License
+
+MIT
+
+## Contributing
+
+Contributions welcome! Please open an issue or pull request.
