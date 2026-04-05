@@ -41,7 +41,7 @@ def main():
     parser.add_argument(
         '--auto-push',
         action='store_true',
-        help='Automatically push to remote after each completed item'
+        help='Automatically push commits to remote after each completed item'
     )
     parser.add_argument(
         '--dry-run',

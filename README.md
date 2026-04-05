@@ -189,6 +189,56 @@ ralph --mark-complete ITEM-ID
 ralph --reset-item ITEM-ID
 ```
 
+## Git Integration
+
+Ralph Loop automatically commits changes after each successful iteration.
+
+### Automatic Commits
+
+After each item completes validation:
+1. All file changes are staged (`git add -A`)
+2. A structured commit is created with:
+   - Item ID and title
+   - List of deliverables (with completion status)
+   - List of exit criteria (with completion status)
+   - Co-authored-by attribution
+
+Example commit message:
+```
+[implement-api-endpoints] Implement API Endpoints
+
+Deliverables:
+  ✓ Create API controllers
+  ✓ Add unit tests
+  ✓ Add integration tests
+
+Exit criteria:
+  ✓ All tests pass
+  ✓ API responds correctly
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+```
+
+### Automatic Push
+
+Use `--auto-push` to automatically push commits to remote:
+
+```bash
+ralph --auto-push
+```
+
+This will:
+1. Commit changes after each iteration
+2. Push commits to remote immediately
+
+Without `--auto-push`, commits are created locally but not pushed.
+
+### Requirements
+
+- Git repository must be initialized
+- Git user must be configured (`git config user.name` and `git config user.email`)
+- For `--auto-push`: remote must be configured and accessible
+
 ## Project Requirements
 
 Ralph Loop expects the following structure in target projects:

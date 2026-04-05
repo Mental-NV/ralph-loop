@@ -159,6 +159,50 @@ class BacklogOrchestrator:
             return False
         return True
 
+    def git_commit(self, message: str) -> bool:
+        """Create a git commit with all changes. Returns True on success."""
+        if self.dry_run:
+            print("[DRY RUN] Would run: git add -A")
+            print(f"[DRY RUN] Would run: git commit -m '{message[:50]}...'")
+            return True
+
+        # Stage all changes
+        result = subprocess.run(
+            ["git", "add", "-A"],
+            cwd=self.project_dir,
+            capture_output=True,
+            text=True
+        )
+        if result.returncode != 0:
+            print(f"git add failed: {result.stderr}", file=sys.stderr)
+            return False
+
+        # Check if there are changes to commit
+        result = subprocess.run(
+            ["git", "diff", "--cached", "--quiet"],
+            cwd=self.project_dir,
+            capture_output=True,
+            text=True
+        )
+        if result.returncode == 0:
+            # No changes staged
+            print("No changes to commit")
+            return True
+
+        # Create commit
+        result = subprocess.run(
+            ["git", "commit", "-m", message],
+            cwd=self.project_dir,
+            capture_output=True,
+            text=True
+        )
+        if result.returncode != 0:
+            print(f"git commit failed: {result.stderr}", file=sys.stderr)
+            return False
+
+        print(f"✓ Created commit: {message.split(chr(10))[0]}")  # First line only
+        return True
+
     def select_next_item(self, backlog: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
         Select next item to execute based on:
@@ -447,6 +491,36 @@ class BacklogOrchestrator:
 
         return "\n".join(lines)
 
+    def build_commit_message(self, item: Dict[str, Any]) -> str:
+        """Build commit message for completed item."""
+        lines = [
+            f"[{item['id']}] {item['title']}",
+            "",
+        ]
+
+        # Add deliverables
+        deliverables = item.get('deliverables', [])
+        if deliverables:
+            lines.append("Deliverables:")
+            for deliverable in deliverables:
+                status = "✓" if deliverable.get('done') else "○"
+                lines.append(f"  {status} {deliverable['text']}")
+            lines.append("")
+
+        # Add exit criteria
+        exit_criteria = item.get('exitCriteria', [])
+        if exit_criteria:
+            lines.append("Exit criteria:")
+            for criterion in exit_criteria:
+                status = "✓" if criterion.get('done') else "○"
+                lines.append(f"  {status} {criterion['text']}")
+            lines.append("")
+
+        # Add co-author
+        lines.append("Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>")
+
+        return "\n".join(lines)
+
     def run_loop(self, max_iterations: Optional[int] = None) -> int:
         """
         Main execution loop with multi-phase execution.
@@ -494,11 +568,15 @@ class BacklogOrchestrator:
 
                 print(f"\n✓ Completed: {item['title']}")
 
+                # Create git commit with all changes
+                commit_message = self.build_commit_message(item)
+                if not self.git_commit(commit_message):
+                    print("Warning: git commit failed", file=sys.stderr)
+                    # Continue anyway - don't fail the iteration
+
                 # Git push if auto-push enabled
                 if self.auto_push:
-                    if not self.check_git_clean():
-                        print("Working tree has uncommitted changes, skipping push")
-                    elif not self.git_push():
+                    if not self.git_push():
                         print("Warning: git push failed", file=sys.stderr)
 
                 continue  # Process next iteration
