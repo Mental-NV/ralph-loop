@@ -8,7 +8,25 @@ Handles parsing of agent responses into structured backlog data.
 import json
 import re
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
+
+
+def validate_against_schema(data: Dict[str, Any], schema_name: str = 'backlog') -> Tuple[bool, List[str]]:
+    """
+    Validate data against schema.
+
+    Args:
+        data: Parsed JSON data
+        schema_name: Schema to validate against ('backlog', 'analysis', etc.)
+
+    Returns:
+        Tuple of (is_valid, error_messages)
+    """
+    from ralph.validator import load_bundled_schema, validate_schema
+
+    schema = load_bundled_schema()
+    errors = validate_schema(data, schema)
+    return (len(errors) == 0, errors)
 
 
 def parse_stream_json_response(response: str) -> Optional[str]:
@@ -236,8 +254,10 @@ def parse_roadmap_response(response: str, debug_dir: Path) -> Dict[str, Any]:
         Parsed backlog dict
 
     Raises:
-        ValueError: If all parsing strategies fail
+        ValueError: If all parsing strategies fail or schema validation fails
     """
+    result = None
+
     # Try tier 0: Stream-json extraction
     # Check if response looks like stream-json (multiple lines with JSON objects)
     if response.count('\n') > 10 and '"type":"stream_event"' in response:
@@ -246,27 +266,49 @@ def parse_roadmap_response(response: str, debug_dir: Path) -> Dict[str, Any]:
             # Try parsing the extracted text as JSON
             result = parse_json_response(extracted_text)
             if result:
-                return result
+                # Validate before returning
+                is_valid, errors = validate_against_schema(result)
+                if is_valid:
+                    return result
+                # Continue to other strategies if validation fails
 
             # Try extracting JSON from markdown in the extracted text
             result = extract_json_from_markdown(extracted_text)
             if result:
-                return result
+                is_valid, errors = validate_against_schema(result)
+                if is_valid:
+                    return result
 
     # Try tier 1: Direct JSON
     result = parse_json_response(response)
     if result:
-        return result
+        is_valid, errors = validate_against_schema(result)
+        if is_valid:
+            return result
 
     # Try tier 2: JSON extraction from markdown
     result = extract_json_from_markdown(response)
     if result:
-        return result
+        is_valid, errors = validate_against_schema(result)
+        if is_valid:
+            return result
 
     # Try tier 3: Markdown structure parsing
     result = parse_markdown_roadmap(response)
     if result:
-        return result
+        is_valid, errors = validate_against_schema(result)
+        if is_valid:
+            return result
+        # If we got a result but validation failed, save it for debugging
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        debug_file = debug_dir / f"invalid-schema-{timestamp}.json"
+        debug_file.write_text(json.dumps(result, indent=2))
+        error_msg = "\n".join(errors)
+        raise ValueError(
+            f"Parsed JSON but schema validation failed:\n{error_msg}\n\n"
+            f"Invalid JSON saved to: {debug_file}"
+        )
 
     # All strategies failed - save debug output
     from datetime import datetime
@@ -282,3 +324,57 @@ def parse_roadmap_response(response: str, debug_dir: Path) -> Dict[str, Any]:
         f"Response preview:\n{preview}\n\n"
         f"Full response saved to: {debug_file}"
     )
+
+
+def parse_analysis_response(response: str, debug_dir: Path) -> Dict[str, Any]:
+    """
+    Parse agent analysis response using multi-tier strategy.
+
+    Similar to parse_roadmap_response but expects different schema.
+
+    Args:
+        response: Raw agent response
+        debug_dir: Directory to save debug output
+
+    Returns:
+        Parsed analysis dict
+
+    Raises:
+        ValueError: If all parsing strategies fail
+    """
+    # Try tier 0: Stream-json extraction
+    if response.count('\n') > 10 and '"type":"stream_event"' in response:
+        extracted_text = parse_stream_json_response(response)
+        if extracted_text:
+            result = parse_json_response(extracted_text)
+            if result and 'metrics' in result:
+                return result
+
+            result = extract_json_from_markdown(extracted_text)
+            if result and 'metrics' in result:
+                return result
+
+    # Try tier 1: Direct JSON
+    result = parse_json_response(response)
+    if result and 'metrics' in result:
+        return result
+
+    # Try tier 2: JSON extraction from markdown
+    result = extract_json_from_markdown(response)
+    if result and 'metrics' in result:
+        return result
+
+    # All strategies failed
+    from datetime import datetime
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    debug_file = debug_dir / f"failed-analysis-parse-{timestamp}.txt"
+    debug_file.write_text(response)
+
+    preview = response[:500] + "..." if len(response) > 500 else response
+
+    raise ValueError(
+        f"Failed to parse analysis response. Tried JSON and markdown extraction.\n"
+        f"Response preview:\n{preview}\n\n"
+        f"Full response saved to: {debug_file}"
+    )
+

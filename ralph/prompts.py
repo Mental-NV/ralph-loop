@@ -2,8 +2,29 @@
 """
 Prompt templates for Ralph Loop initialization.
 
-Generates meta-prompts that instruct agents to produce structured roadmaps.
+Loads prompts from text files and renders them with variables.
 """
+
+import json
+from ralph.prompt_loader import PromptLoader
+
+# Initialize loader
+_loader = PromptLoader()
+
+
+def load_schema_for_prompt() -> str:
+    """
+    Load backlog schema and format it for inclusion in prompts.
+
+    Returns:
+        Formatted schema as string
+    """
+    from ralph.validator import load_bundled_schema
+
+    schema = load_bundled_schema()
+
+    # Format as readable JSON
+    return json.dumps(schema, indent=2)
 
 
 def build_roadmap_prompt(user_prompt: str, output_file: str) -> str:
@@ -22,125 +43,59 @@ def build_roadmap_prompt(user_prompt: str, output_file: str) -> str:
     Returns:
         Formatted prompt for the agent
     """
-    return f"""You are a software architect helping to plan a project for autonomous implementation by AI agents.
+    schema = load_schema_for_prompt()
+    return _loader.load('roadmap',
+                       user_prompt=user_prompt,
+                       output_file=output_file,
+                       schema=schema)
 
-# Project Request
-{user_prompt}
 
-# Your Task
-Generate a comprehensive project roadmap with milestones suitable for autonomous implementation. Each milestone should be independently implementable by a frontier AI agent (Claude, Qwen, Codex).
+def build_analysis_prompt(backlog_json: str, project_dir: str, output_file: str, threshold: int = 75) -> str:
+    """
+    Build meta-prompt for backlog analysis.
 
-Write the roadmap as a JSON file to: {output_file}
+    Returns a prompt that instructs the agent to:
+    1. Analyze the backlog for automation readiness
+    2. Evaluate environment compatibility and agent capabilities
+    3. Write structured JSON analysis to a file
 
-# Output Format
-The JSON file must match this exact structure:
+    Args:
+        backlog_json: Full backlog.json content as string
+        project_dir: Project directory path for environment inspection
+        output_file: Path where the agent should write the analysis JSON
+        threshold: Target quality score for automation readiness (1-100)
 
-{{
-  "version": "1.0.0",
-  "items": [
-    {{
-      "title": "Milestone title",
-      "why": "Why this milestone is important",
-      "priority": "P0",
-      "dependsOn": [],
-      "deliverables": [
-        "Concrete deliverable 1",
-        "Concrete deliverable 2"
-      ],
-      "exitCriteria": [
-        "Testable criterion 1",
-        "Testable criterion 2"
-      ],
-      "risks": [
-        "Risk 1",
-        "Risk 2"
-      ],
-      "validation": {{
-        "commands": ["command1", "command2"]
-      }}
-    }}
-  ]
-}}
+    Returns:
+        Formatted prompt for the agent
+    """
+    return _loader.load('analysis',
+                       backlog_json=backlog_json,
+                       project_dir=project_dir,
+                       output_file=output_file,
+                       threshold=threshold)
 
-# Guidelines
 
-**Milestones:**
-- Break the project into 5-15 logical milestones
-- Each milestone should be completable in one focused work session
-- Order milestones logically (foundation → core features → enhancements → polish)
-- Make each milestone independently implementable where possible
+def build_refinement_prompt(backlog_json: str, user_prompt: str, output_file: str) -> str:
+    """
+    Build meta-prompt for backlog refinement.
 
-**Priorities:**
-- P0: Foundation and infrastructure (setup, core architecture)
-- P1: Core features and functionality
-- P2: Enhancements and improvements
-- P3: Polish, optimization, nice-to-have features
+    Returns a prompt that instructs the agent to:
+    1. Read the current backlog
+    2. Apply the user's refinement instructions
+    3. Generate an improved backlog
+    4. Write structured JSON to a file
 
-**Dependencies:**
-- Use dependsOn array to specify which milestones must complete first
-- Reference dependencies by their exact title
-- Ensure dependencies form a DAG (no circular dependencies)
-- Minimize dependencies to allow parallel work where possible
+    Args:
+        backlog_json: Full backlog.json content as string
+        user_prompt: User's refinement instructions
+        output_file: Path where the agent should write the refined backlog JSON
 
-**Deliverables:**
-- List concrete, verifiable outputs (files, functions, tests, docs)
-- Be specific: "Create src/parser.py with parse() function" not "Write parser"
-- Each deliverable should be checkable by an agent
-
-**Exit Criteria:**
-- Define how to verify the milestone is complete
-- Make criteria testable and objective
-- Include both functional and quality checks
-- Examples: "All tests pass", "Code follows style guide", "API returns expected responses"
-
-**Risks:**
-- Identify potential blockers or challenges
-- Suggest mitigation strategies where applicable
-- Be realistic about complexity
-
-**Validation Commands:**
-- Provide shell commands to verify completion
-- Examples: "pytest tests/", "npm test", "python -m mypy src/"
-- Commands should be runnable in the project directory
-
-# Example Milestone
-
-{{
-  "title": "Setup Project Structure",
-  "why": "Establishes foundation for all subsequent development work",
-  "priority": "P0",
-  "dependsOn": [],
-  "deliverables": [
-    "Create project directory structure (src/, tests/, docs/)",
-    "Initialize git repository with .gitignore",
-    "Create requirements.txt or package.json with dependencies",
-    "Setup virtual environment or node_modules",
-    "Create README.md with project overview"
-  ],
-  "exitCriteria": [
-    "Project structure follows language best practices",
-    "All dependencies install without errors",
-    "Git repository is initialized and clean",
-    "README documents project purpose and setup"
-  ],
-  "risks": [
-    "Dependency conflicts - mitigate by pinning versions"
-  ],
-  "validation": {{
-    "commands": [
-      "ls -la",
-      "git status",
-      "test -f README.md"
-    ]
-  }}
-}}
-
-# Important Notes
-- Write the JSON to the specified file path
-- Ensure all JSON is valid and properly escaped
-- Make milestones actionable and specific to the project request
-- Consider the target language, framework, and tools mentioned in the request
-- Design for autonomous implementation - agents won't ask clarifying questions
-- Use the write_file tool to create the JSON file
-
-Generate the roadmap and write it to the file now."""
+    Returns:
+        Formatted prompt for the agent
+    """
+    schema = load_schema_for_prompt()
+    return _loader.load('refinement',
+                       backlog_json=backlog_json,
+                       user_prompt=user_prompt,
+                       output_file=output_file,
+                       schema=schema)

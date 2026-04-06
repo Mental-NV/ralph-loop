@@ -12,6 +12,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict
 
+from ralph.paths import RalphPaths
 from ralph.providers import get_provider, list_available_providers
 
 # ANSI color codes for output
@@ -42,7 +43,10 @@ class BacklogInitializer:
         self.backlog_path = backlog_path
         self.provider_name = provider
         self.dry_run = dry_run
-        self.debug_dir = project_dir / "logs" / "ralph" / "init"
+
+        # Initialize paths
+        self.paths = RalphPaths(project_dir)
+        self.debug_dir = self.paths.init_logs
 
         # Initialize provider
         try:
@@ -92,7 +96,7 @@ class BacklogInitializer:
                 return 1
 
         # Ensure debug directory exists
-        self.debug_dir.mkdir(parents=True, exist_ok=True)
+        self.paths.ensure_dirs(self.debug_dir)
 
         try:
             # Step 1: Build roadmap prompt with temp output file
@@ -299,11 +303,9 @@ class BacklogInitializer:
             True if valid, False otherwise
         """
         # Write to temp file for validation
-        temp_path = self.backlog_path.with_suffix('.json.validate')
+        temp_path = self.paths.get_temp_file(self.backlog_path, '.validate')
+        self.paths.ensure_dirs(self.paths.tmp_dir)
         try:
-            # Ensure parent directory exists
-            temp_path.parent.mkdir(parents=True, exist_ok=True)
-
             with open(temp_path, 'w', encoding='utf-8') as f:
                 json.dump(backlog, f, indent=2)
 
@@ -334,7 +336,8 @@ class BacklogInitializer:
         self.backlog_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Atomic write pattern from orchestrator
-        temp_path = self.backlog_path.with_suffix('.json.tmp')
+        temp_path = self.paths.get_temp_file(self.backlog_path, '.tmp')
+        self.paths.ensure_dirs(self.paths.tmp_dir)
         try:
             with open(temp_path, 'w', encoding='utf-8') as f:
                 json.dump(backlog, f, indent=2, ensure_ascii=False)

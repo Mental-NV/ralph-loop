@@ -9,6 +9,44 @@ import re
 from typing import Any, Dict, List, Set
 
 
+def normalize_risks(risks: List[Any]) -> List[Any]:
+    """
+    Normalize risk format to ensure schema compliance.
+
+    Accepts:
+    - Strings: passed through unchanged
+    - Objects with 'text': validated and passed through
+    - Objects without 'text': converted to string (best effort)
+
+    Args:
+        risks: List of risks (strings or objects)
+
+    Returns:
+        Normalized list of risks
+    """
+    normalized = []
+    for risk in risks:
+        if isinstance(risk, str):
+            normalized.append(risk)
+        elif isinstance(risk, dict):
+            if 'text' in risk:
+                # Valid risk object
+                normalized.append(risk)
+            else:
+                # Invalid object - try to extract meaningful string
+                # Look for common fields: description, message, risk, etc.
+                text = (risk.get('description') or
+                       risk.get('message') or
+                       risk.get('risk') or
+                       str(risk))
+                normalized.append(text)
+        else:
+            # Unexpected type - convert to string
+            normalized.append(str(risk))
+
+    return normalized
+
+
 def generate_item_id(title: str, existing_ids: Set[str]) -> str:
     """
     Generate unique kebab-case ID from title.
@@ -275,7 +313,7 @@ def transform_to_backlog(parsed_data: Dict[str, Any]) -> Dict[str, Any]:
             'why': item.get('why', ''),
             'deliverables': deliverables,
             'exitCriteria': exit_criteria,
-            'risks': item.get('risks', []),
+            'risks': normalize_risks(item.get('risks', [])),
         }
 
         # Add validation commands if present

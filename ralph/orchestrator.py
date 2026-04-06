@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from ralph.paths import RalphPaths
 from ralph.providers import get_provider, list_available_providers
 
 
@@ -25,14 +26,19 @@ class BacklogOrchestrator:
         backlog_path: Path,
         provider: str = "qwen",
         auto_push: bool = False,
-        dry_run: bool = False
+        dry_run: bool = False,
+        continue_on_error: bool = False
     ):
         self.project_dir = project_dir
         self.backlog_path = backlog_path
         self.provider_name = provider
         self.auto_push = auto_push
         self.dry_run = dry_run
-        self.lock_path = project_dir / ".ralph-loop.lock"
+        self.continue_on_error = continue_on_error
+
+        # Initialize paths
+        self.paths = RalphPaths(project_dir)
+        self.lock_path = self.paths.lock_file
 
         # Initialize provider (YOLO mode always enabled)
         try:
@@ -70,7 +76,8 @@ class BacklogOrchestrator:
             return
 
         # Write to temp file first
-        temp_path = self.backlog_path.with_suffix('.json.tmp')
+        temp_path = self.paths.get_temp_file(self.backlog_path, '.tmp')
+        self.paths.ensure_dirs(self.paths.tmp_dir)
         try:
             with open(temp_path, 'w', encoding='utf-8') as f:
                 json.dump(backlog, f, indent=2, ensure_ascii=False)
@@ -104,6 +111,7 @@ class BacklogOrchestrator:
                 return False
 
         try:
+            self.paths.ensure_dirs(self.paths.ralph_dir)
             self.lock_path.write_text(f"{os.getpid()}\n{datetime.now(timezone.utc).isoformat()}\n")
             return True
         except Exception as e:
@@ -114,6 +122,31 @@ class BacklogOrchestrator:
         """Release execution lock."""
         if self.lock_path.exists():
             self.lock_path.unlink()
+
+    def check_git_repo(self) -> bool:
+        """
+        Check if current directory is a git repository.
+
+        Uses dual-check approach:
+        1. Fast check for .git directory (common case)
+        2. Fallback to git rev-parse for edge cases (worktrees, submodules)
+
+        Returns:
+            True if git repository exists, False otherwise
+        """
+        # Fast check: .git directory exists
+        git_dir = self.project_dir / ".git"
+        if git_dir.exists():
+            return True
+
+        # Fallback: use git rev-parse for edge cases
+        result = subprocess.run(
+            ["git", "rev-parse", "--git-dir"],
+            cwd=self.project_dir,
+            capture_output=True,
+            text=True
+        )
+        return result.returncode == 0
 
     def check_git_clean(self) -> bool:
         """Check if git working tree is clean."""
@@ -285,6 +318,54 @@ class BacklogOrchestrator:
         ]
         return any(pattern in cmd for pattern in cleanup_patterns)
 
+    def is_background_command(self, cmd: str) -> bool:
+        """Detect commands that use & to run in background."""
+        # Strip whitespace and check if command ends with &
+        return cmd.strip().endswith('&')
+
+    def run_background_command(self, cmd: str) -> bool:
+        """
+        Execute a background command without waiting for completion.
+        Returns True if the command started successfully.
+        """
+        if self.dry_run:
+            print("  [DRY RUN] Would run command in background")
+            return True
+
+        try:
+            # Remove trailing & since we're handling backgrounding ourselves
+            cmd_clean = cmd.strip().rstrip('&').strip()
+
+            # Start process without waiting
+            subprocess.Popen(
+                cmd_clean,
+                shell=True,
+                cwd=self.project_dir,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True  # Detach from parent process group
+            )
+
+            # Give it a moment to start
+            time.sleep(0.5)
+            return True
+
+        except Exception as e:
+            print(f"  FAILED to start background process: {e}", file=sys.stderr)
+            return False
+
+    def is_agent_cancellation(self, stderr: str) -> bool:
+        """Detect if agent was cancelled by user."""
+        cancellation_patterns = [
+            'Operation cancelled',
+            'Operation Cancelled',
+            'User cancelled',
+            'Cancelled by user',
+            'KeyboardInterrupt',
+            'SIGINT'
+        ]
+        return any(pattern in stderr for pattern in cancellation_patterns)
+
     def run_validation_commands(self, item: Dict[str, Any]) -> bool:
         """Run validation commands for item with graceful cleanup handling. Returns True if all critical commands pass."""
         validation = item.get('validation', {})
@@ -297,12 +378,28 @@ class BacklogOrchestrator:
         # Classify commands
         critical_commands = []
         cleanup_commands = []
+        background_commands = []
 
         for cmd in commands:
-            if self.is_cleanup_command(cmd):
+            if self.is_background_command(cmd):
+                background_commands.append(cmd)
+            elif self.is_cleanup_command(cmd):
                 cleanup_commands.append(cmd)
             else:
                 critical_commands.append(cmd)
+
+        # Run background commands first (e.g., start servers)
+        if background_commands:
+            print(f"Starting {len(background_commands)} background process(es)...")
+
+            for i, cmd in enumerate(background_commands, 1):
+                print(f"  [{i}/{len(background_commands)}] {cmd}")
+
+                if not self.run_background_command(cmd):
+                    print(f"  FAILED to start background process", file=sys.stderr)
+                    return False
+
+                print(f"  STARTED")
 
         # Run critical validation
         if critical_commands:
@@ -315,23 +412,29 @@ class BacklogOrchestrator:
                     print("  [DRY RUN] Would run command")
                     continue
 
-                result = subprocess.run(
-                    cmd,
-                    shell=True,
-                    cwd=self.project_dir,
-                    capture_output=True,
-                    text=True
-                )
+                try:
+                    result = subprocess.run(
+                        cmd,
+                        shell=True,
+                        cwd=self.project_dir,
+                        capture_output=True,
+                        text=True,
+                        timeout=300  # 5 minute timeout
+                    )
 
-                if result.returncode != 0:
-                    print(f"  FAILED (exit code {result.returncode})", file=sys.stderr)
-                    if result.stdout:
-                        print("  stdout:", result.stdout[:500], file=sys.stderr)
-                    if result.stderr:
-                        print("  stderr:", result.stderr[:500], file=sys.stderr)
+                    if result.returncode != 0:
+                        print(f"  FAILED (exit code {result.returncode})", file=sys.stderr)
+                        if result.stdout:
+                            print("  stdout:", result.stdout[:500], file=sys.stderr)
+                        if result.stderr:
+                            print("  stderr:", result.stderr[:500], file=sys.stderr)
+                        return False
+
+                    print(f"  PASSED")
+
+                except subprocess.TimeoutExpired:
+                    print(f"  FAILED (timeout after 300s)", file=sys.stderr)
                     return False
-
-                print(f"  PASSED")
 
         # Run cleanup commands (best-effort)
         if cleanup_commands:
@@ -429,6 +532,15 @@ class BacklogOrchestrator:
                 agent_proc.wait()
                 if agent_proc.returncode != 0:
                     stderr = agent_proc.stderr.read() if agent_proc.stderr else ""
+
+                    # Check if this was a user cancellation
+                    if self.is_agent_cancellation(stderr):
+                        print(f"\nAgent execution was cancelled by user", file=sys.stderr)
+                        print(f"Item {item_id} remains in 'in_progress' status", file=sys.stderr)
+                        print(f"You can retry by running Ralph Loop again, or use --reset-item to start over", file=sys.stderr)
+                        return False
+
+                    # Regular error handling
                     if stderr:
                         print(f"\nAgent error output:\n{stderr}", file=sys.stderr)
                     return False
@@ -438,9 +550,20 @@ class BacklogOrchestrator:
                 result = subprocess.run(
                     cmd,
                     cwd=self.project_dir,
+                    capture_output=True,
                     text=True
                 )
                 if result.returncode != 0:
+                    # Check if this was a user cancellation
+                    if self.is_agent_cancellation(result.stderr):
+                        print(f"\nAgent execution was cancelled by user", file=sys.stderr)
+                        print(f"Item {item_id} remains in 'in_progress' status", file=sys.stderr)
+                        print(f"You can retry by running Ralph Loop again, or use --reset-item to start over", file=sys.stderr)
+                        return False
+
+                    # Regular error handling
+                    if result.stderr:
+                        print(f"\nAgent error output:\n{result.stderr}", file=sys.stderr)
                     return False
 
             return True
@@ -454,42 +577,60 @@ class BacklogOrchestrator:
 
     def build_execution_prompt(self, item: Dict[str, Any]) -> str:
         """Build execution prompt for item."""
-        lines = [
-            f"Execute backlog item: {item['title']}",
-            "",
-            f"**Why:** {item.get('why', 'No rationale provided')}",
-            "",
-            "**Deliverables:**"
-        ]
+        from ralph.prompt_loader import PromptLoader
 
-        for deliverable in item.get('deliverables', []):
-            status = "✓" if deliverable.get('done') else "○"
-            lines.append(f"  {status} {deliverable['text']}")
+        loader = PromptLoader()
 
-        lines.append("")
-        lines.append("**Exit Criteria:**")
+        # Format deliverables
+        deliverables = "\n".join([
+            f"  {'✓' if d.get('done') else '○'} {d['text']}"
+            for d in item.get('deliverables', [])
+        ])
 
-        for criterion in item.get('exitCriteria', []):
-            status = "✓" if criterion.get('done') else "○"
-            lines.append(f"  {status} {criterion['text']}")
+        # Format exit criteria
+        exit_criteria = "\n".join([
+            f"  {'✓' if c.get('done') else '○'} {c['text']}"
+            for c in item.get('exitCriteria', [])
+        ])
 
+        # Format risks
         if item.get('risks'):
-            lines.append("")
-            lines.append("**Risks:**")
-            for risk in item['risks']:
-                lines.append(f"  - {risk}")
+            risks = "\n".join([
+                f"  - {self._format_risk(risk)}"
+                for risk in item['risks']
+            ])
+        else:
+            risks = "None specified"
 
+        # Format validation commands
         validation = item.get('validation', {})
         if validation.get('commands'):
-            lines.append("")
-            lines.append("**Validation Commands:**")
-            for cmd in validation['commands']:
-                lines.append(f"  - {cmd}")
+            validation_commands = "\n".join([
+                f"  - {cmd}"
+                for cmd in validation['commands']
+            ])
+        else:
+            validation_commands = "None specified"
 
-        lines.append("")
-        lines.append("Please implement this milestone following the deliverables and exit criteria.")
+        return loader.load('execution',
+                          title=item['title'],
+                          why=item.get('why', 'No rationale provided'),
+                          deliverables=deliverables,
+                          exit_criteria=exit_criteria,
+                          risks=risks,
+                          validation_commands=validation_commands)
 
-        return "\n".join(lines)
+    def _format_risk(self, risk: Any) -> str:
+        """Format risk for display (handles both strings and objects)."""
+        if isinstance(risk, str):
+            return risk
+        elif isinstance(risk, dict):
+            text = risk.get('text', str(risk))
+            mitigation = risk.get('mitigation')
+            if mitigation:
+                return f"{text} (Mitigation: {mitigation})"
+            return text
+        return str(risk)
 
     def build_commit_message(self, item: Dict[str, Any]) -> str:
         """Build commit message for completed item."""
@@ -612,6 +753,19 @@ class BacklogOrchestrator:
 
             if not success:
                 print(f"\nWork phase failed for {next_item['id']}", file=sys.stderr)
+
+                # Check if item is still in_progress (agent may have been cancelled)
+                backlog = self.load_backlog()
+                item = next((i for i in backlog['items'] if i['id'] == next_item['id']), None)
+
+                if item and item['status'] == 'in_progress':
+                    print(f"Item remains in 'in_progress' status - you can retry or use --reset-item", file=sys.stderr)
+
+                    # If continue_on_error is enabled, continue to next iteration
+                    if self.continue_on_error:
+                        print(f"Continuing to next iteration (--continue-on-error enabled)", file=sys.stderr)
+                        continue
+
                 return 1
 
             # Mark work complete and transition to ready_for_validation

@@ -1,0 +1,214 @@
+You are a software project analyst evaluating a backlog for autonomous AI agent execution.
+
+# Backlog to Analyze
+
+{backlog_json}
+
+# Project Directory
+
+{project_dir}
+
+# Your Task
+
+Analyze this backlog and evaluate its readiness for full-auto long-running execution by AI agents. Assess the quality, completeness, automation-readiness, environment compatibility, and agent capability alignment.
+
+Write your analysis as a JSON file to: {output_file}
+
+# Analysis Criteria
+
+Evaluate the backlog on these 9 dimensions (0-100 scores):
+
+## 1. Clarity (0-100, weight: 0.15)
+Are titles, why statements, deliverables, and exit criteria clear and specific?
+- Check for vague language ("implement stuff", "make it work")
+- Verify why statements explain rationale
+- Ensure deliverables are concrete and actionable
+- Confirm exit criteria are specific and measurable
+
+## 2. Completeness (0-100, weight: 0.10)
+Do items have all required fields? Are deliverables/exit criteria comprehensive?
+- All required fields present (id, title, status, priority, order)
+- Optional but important fields populated (why, deliverables, exitCriteria)
+- Adequate number of deliverables per item (suggest 2-5)
+- Adequate number of exit criteria per item (suggest 2-4)
+
+## 3. Automation-Readiness (0-100, weight: 0.20)
+Are validation commands present and executable?
+- Validation commands present for most items
+- Commands are executable (not pseudo-code)
+- Deliverables reference specific files/functions
+- Exit criteria can be verified programmatically
+
+## 4. Dependency Structure (0-100, weight: 0.10)
+Are dependencies well-defined? Reasonable parallelization?
+- Dependencies are necessary and sufficient
+- Reasonable parallelization opportunities
+- P0 items have minimal dependencies
+- No circular dependencies (already validated by schema)
+
+## 5. Risk Awareness (0-100, weight: 0.10)
+Are risks identified and mitigation strategies present?
+- Risks identified for complex items
+- Mitigation strategies included
+- Realistic assessment of complexity
+
+## 6. Granularity (0-100, weight: 0.10)
+Are items appropriately sized?
+- Items completable in one focused session
+- Not too many tiny items (suggest 5-15 total)
+- Not too few massive items
+- Balanced distribution of work
+
+## 7. Priority Alignment (0-100, weight: 0.05)
+Do priorities make sense?
+- P0 items are infrastructure/foundation
+- P1 items are core features
+- P2 items are enhancements
+- P3 items are polish/nice-to-have
+- Dependencies respect priority ordering
+
+## 8. Environment Compatibility (0-100, weight: 0.15)
+**IMPORTANT: Dynamically assess environment based on backlog requirements**
+
+Steps to evaluate:
+1. Parse backlog items to identify required tech stack (languages, tools, databases, services)
+2. Use bash commands to check for required tools in the environment
+3. Compare requirements vs. availability
+4. Score based on how many requirements are satisfied
+
+Example checks (adapt based on actual backlog):
+- If backlog mentions ".NET" or "dotnet" → run `dotnet --version`
+- If backlog mentions "Node.js" or "npm" → run `node --version` and `npm --version`
+- If backlog mentions "Python" or "pip" → run `python --version` or `python3 --version`
+- If backlog mentions "PostgreSQL" → check for `psql` command
+- If backlog mentions "Docker" → check for `docker` command
+- If backlog mentions "xUnit" → check `dotnet test --help`
+- If backlog mentions "Vitest" → check for package.json or `npm list vitest`
+
+Report findings:
+- List detected tools with versions
+- List missing tools with item IDs that require them
+- Provide available_tools and missing_tools arrays
+
+## 9. Agent Capability Alignment (0-100, weight: 0.05)
+**IMPORTANT: Dynamically assess required operations**
+
+Steps to evaluate:
+1. Parse backlog items to identify required operations
+2. Assess if operations are within typical AI agent capabilities
+3. Flag operations requiring human approval or elevated permissions
+4. Return boolean flags for automated decision-making
+
+Permission flags to set:
+- requires_network: true if items need external API calls, package downloads (npm install, dotnet restore)
+- requires_destructive_ops: true if items include file deletion, database drops, rm -rf
+- requires_system_admin: true if items need sudo, elevated permissions
+- requires_external_services: true if items depend on third-party APIs or services
+
+# Output Format
+
+Write a JSON file with this exact structure:
+
+{{
+  "version": "1.0.0",
+  "analyzed_at": "<ISO 8601 timestamp>",
+  "backlog_path": "<path to backlog>",
+  "tech_stack_detected": {{
+    "backend": ["<detected backend tech>"],
+    "database": ["<detected database>"],
+    "backend_tests": ["<detected test framework>"],
+    "frontend": ["<detected frontend tech>"],
+    "frontend_tests": ["<detected frontend test framework>"]
+  }},
+  "summary": {{
+    "total_items": <count>,
+    "by_priority": {{"P0": <count>, "P1": <count>, "P2": <count>, "P3": <count>}},
+    "by_status": {{"todo": <count>, "in_progress": <count>, "done": <count>}}
+  }},
+  "metrics": {{
+    "clarity": {{
+      "score": <0-100>,
+      "weight": 0.15,
+      "findings": ["<finding 1>", "<finding 2>", ...]
+    }},
+    "completeness": {{
+      "score": <0-100>,
+      "weight": 0.10,
+      "findings": [...]
+    }},
+    "automation_readiness": {{
+      "score": <0-100>,
+      "weight": 0.20,
+      "findings": [...]
+    }},
+    "dependency_structure": {{
+      "score": <0-100>,
+      "weight": 0.10,
+      "findings": [...]
+    }},
+    "risk_awareness": {{
+      "score": <0-100>,
+      "weight": 0.10,
+      "findings": [...]
+    }},
+    "granularity": {{
+      "score": <0-100>,
+      "weight": 0.10,
+      "findings": [...]
+    }},
+    "priority_alignment": {{
+      "score": <0-100>,
+      "weight": 0.05,
+      "findings": [...]
+    }},
+    "environment_compatibility": {{
+      "score": <0-100>,
+      "weight": 0.15,
+      "findings": ["<tool> detected (version X)", "Item '<id>' requires <tool> (not detected)", ...],
+      "missing_tools": ["<tool1>", "<tool2>"],
+      "available_tools": ["<tool1>", "<tool2>"]
+    }},
+    "agent_capability_alignment": {{
+      "score": <0-100>,
+      "weight": 0.05,
+      "findings": ["<finding 1>", "<finding 2>", ...],
+      "permission_flags": {{
+        "requires_network": <true|false>,
+        "requires_destructive_ops": <true|false>,
+        "requires_system_admin": <true|false>,
+        "requires_external_services": <true|false>
+      }}
+    }}
+  }},
+  "overall_score": <weighted average>,
+  "threshold": {threshold},
+  "ready_for_auto": <true if overall_score >= threshold>,
+  "issues": [
+    {{
+      "severity": "error|warning|info",
+      "category": "<metric name>",
+      "item_id": "<item-id or null>",
+      "message": "<description>"
+    }}
+  ],
+  "recommendations": [
+    "<actionable recommendation 1>",
+    "<actionable recommendation 2>",
+    ...
+  ],
+  "follow_up_prompt": "<detailed prompt for improving the backlog>"
+}}
+
+# Guidelines
+
+- Be thorough but fair in your assessment
+- Provide specific, actionable findings for each metric
+- Reference specific item IDs in issues and recommendations
+- Calculate overall_score as weighted average: clarity*0.15 + completeness*0.10 + automation*0.20 + dependencies*0.10 + risks*0.10 + granularity*0.10 + priority*0.05 + environment*0.15 + capability*0.05
+- Set ready_for_auto to true if overall_score >= 75
+- Make follow_up_prompt detailed and actionable
+- For environment_compatibility: actually run bash commands to check for tools
+- For agent_capability_alignment: analyze operations and set permission flags accurately
+- Use the write_file tool to create the JSON file
+
+Generate the analysis and write it to the file now.

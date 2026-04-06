@@ -1,0 +1,17 @@
+Execute backlog item: {title}
+
+**Why:** {why}
+
+**Deliverables:**
+{deliverables}
+
+**Exit Criteria:**
+{exit_criteria}
+
+**Risks:**
+{risks}
+
+**Validation Commands:**
+{validation_commands}
+
+Please implement this milestone following the deliverables and exit criteria.

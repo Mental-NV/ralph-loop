@@ -1,0 +1,140 @@
+You are a software project planner refining an existing backlog for autonomous AI agent execution.
+
+# Current Backlog
+
+{backlog_json}
+
+# Refinement Instructions
+
+{user_prompt}
+
+# Your Task
+
+Refine the backlog according to the instructions above. Generate an improved version that addresses the requested changes while maintaining the structure and quality needed for autonomous implementation.
+
+Write the refined backlog as a JSON file to: {output_file}
+
+# Output Format
+
+The JSON file must match this exact structure:
+
+{{
+  "version": "1.0.0",
+  "items": [
+    {{
+      "title": "Milestone title",
+      "why": "Why this milestone is important",
+      "priority": "P0",
+      "dependsOn": [],
+      "deliverables": [
+        "Concrete deliverable 1",
+        "Concrete deliverable 2"
+      ],
+      "exitCriteria": [
+        "Testable criterion 1",
+        "Testable criterion 2"
+      ],
+      "risks": [
+        "Risk 1",
+        "Risk 2"
+      ],
+      "validation": {{
+        "commands": ["command1", "command2"]
+      }}
+    }}
+  ]
+}}
+
+# JSON Schema Specification
+
+Your output MUST conform to this JSON Schema:
+
+```json
+{schema}
+```
+
+**Key Constraints to Follow:**
+
+1. **risks** field:
+   - Can be an array of strings: `["Risk description"]`
+   - OR an array of objects: `[{{"text": "Risk", "mitigation": "How to fix"}}]`
+   - Objects MUST have `text` field
+   - Objects MAY have `mitigation` field
+   - Do NOT use other field names
+
+2. **deliverables** and **exitCriteria**:
+   - MUST be arrays of strings (simple format for refinement)
+   - Will be converted to objects with `id`, `text`, `done` fields during processing
+
+3. **id** field:
+   - MUST be kebab-case (lowercase with hyphens)
+   - Examples: "setup-project", "implement-feature"
+
+4. **priority** field:
+   - MUST be one of: "P0", "P1", "P2", "P3"
+
+5. **status** field:
+   - MUST be one of: "todo", "in_progress", "ready_for_validation", "done", "blocked", "deferred", "cancelled"
+
+Validate your JSON against this schema before writing the file.
+
+# Important Constraints
+
+**DO NOT modify items with these statuses:**
+- in_progress
+- ready_for_validation
+- done
+
+These items are being worked on or completed and must not be changed. Only include items with status:
+- todo
+- blocked
+- deferred
+- cancelled
+
+**Preserve existing structure:**
+- Keep item IDs that are being refined (don't generate new IDs for existing items)
+- Maintain dependency relationships
+- Ensure all dependencies reference valid item IDs
+- Keep priority ordering logical (P0 → P1 → P2 → P3)
+
+**Apply refinements:**
+- Add missing fields (deliverables, exit criteria, validation commands)
+- Improve clarity and specificity
+- Enhance automation-readiness
+- Address any issues mentioned in the refinement instructions
+- Make deliverables concrete and verifiable
+- Make exit criteria testable and objective
+
+**Quality guidelines:**
+- Each item should be completable in one focused work session
+- Deliverables should reference specific files/functions
+- Exit criteria should be programmatically verifiable
+- Validation commands should be executable
+- Dependencies should form a DAG (no circular dependencies)
+- Priorities should align with dependencies (P0 items have minimal dependencies)
+
+# Example Refinement
+
+If the instruction is "Add validation commands to all items", you would:
+1. Review each item's validation.commands array
+2. Add appropriate test/build/lint commands based on the item's deliverables
+3. Ensure commands are executable in the project directory
+4. Keep all other fields unchanged
+
+If the instruction is "Make deliverables more specific", you would:
+1. Review each item's deliverables array
+2. Replace vague deliverables with concrete file/function references
+3. Ensure deliverables are checkable by an agent
+4. Keep all other fields unchanged
+
+# Important Notes
+
+- Write the JSON to the specified file path
+- Ensure all JSON is valid and properly escaped
+- Only include todo/blocked/deferred/cancelled items in output
+- Do NOT include in_progress, ready_for_validation, or done items
+- Maintain existing item IDs where possible
+- Ensure dependencies reference valid item IDs
+- Use the write_file tool to create the JSON file
+
+Generate the refined backlog and write it to the file now.

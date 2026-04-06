@@ -71,9 +71,29 @@
         },
         "risks": {
           "type": "array",
-          "description": "List of risks",
+          "description": "List of risks (strings or objects with text and optional mitigation)",
           "items": {
-            "type": "string"
+            "oneOf": [
+              {
+                "type": "string",
+                "description": "Simple risk description"
+              },
+              {
+                "type": "object",
+                "required": ["text"],
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "description": "Risk description"
+                  },
+                  "mitigation": {
+                    "type": "string",
+                    "description": "Mitigation strategy or command to run if risk occurs"
+                  }
+                },
+                "additionalProperties": false
+              }
+            ]
           },
           "default": []
         },

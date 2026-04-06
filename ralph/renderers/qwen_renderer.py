@@ -426,6 +426,10 @@ class Renderer:
         self.pending_tool_text: Optional[str] = None
         self.pending_tool_count = 0
 
+        # Track content block type to suppress partial text output
+        self.current_content_block_type: Optional[str] = None
+        self.suppress_partial_text = True  # Use complete messages by default
+
         self.info(f"raw log: {self.raw_log_path}")
 
     def close(self) -> None:
@@ -557,15 +561,27 @@ class Renderer:
 
     def handle_partial(self, event: Dict[str, Any]) -> None:
         event_type = str(event.get("type", "")).lower()
-        text = extract_partial_text(event)
 
-        if event_type in {"message_start", "content_block_start"}:
+        # Track content block type
+        if event_type == "content_block_start":
+            block = event.get("content_block", {})
+            self.current_content_block_type = block.get("type")
             return
 
-        if event_type in {"message_stop", "content_block_stop"}:
+        if event_type == "content_block_stop":
             self.flush_partial(force=True)
+            self.current_content_block_type = None
             return
 
+        # Skip partial text output if suppressing (wait for complete message)
+        if self.suppress_partial_text and self.current_content_block_type == "text":
+            return
+
+        # For thinking blocks and other content, continue with original logic
+        if event_type in {"message_start"}:
+            return
+
+        text = extract_partial_text(event)
         if not text:
             return
 
@@ -615,6 +631,14 @@ class Renderer:
         text = extract_assistant_text(event)
 
         if text:
+            # When suppressing partial text, always print complete messages
+            # When not suppressing, check for duplicates
+            if self.suppress_partial_text:
+                self.assistant(text)
+                self.partial_emitted_text = ""
+                return
+
+            # Original deduplication logic for partial streaming mode
             normalized_partial = normalize_ws(self.partial_emitted_text)
             if normalized_partial and text == normalized_partial:
                 self.debug("suppressed duplicate final assistant message")
@@ -698,12 +722,21 @@ def parse_args() -> argparse.Namespace:
         default="logs/qwen-stream",
         help="Directory for raw JSONL logs.",
     )
+    parser.add_argument(
+        "--stream-mode",
+        choices=["complete", "partial"],
+        default="complete",
+        help="Use complete messages (less fragmentation) or partial streaming (real-time).",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
     renderer = Renderer(mode=args.mode, raw_log_dir=Path(args.raw_log_dir))
+
+    # Set streaming mode based on CLI flag
+    renderer.suppress_partial_text = (args.stream_mode == "complete")
 
     try:
         for line in sys.stdin:
