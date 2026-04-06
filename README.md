@@ -7,6 +7,7 @@ Ralph Loop is a standalone tool that executes backlog items autonomously using A
 ## Features
 
 - **Backlog initialization**: Generate backlog from natural language prompts using AI
+- **Backlog analysis**: Evaluate backlog readiness for autonomous execution with 9-metric assessment
 - **Multi-provider support**: Qwen (local), Claude Code (CLI), Codex (API)
 - **JSON-driven orchestration**: Backlog items defined in `docs/backlog.json`
 - **Automatic validation**: Schema validation and semantic checks before execution
@@ -16,6 +17,32 @@ Ralph Loop is a standalone tool that executes backlog items autonomously using A
 - **Dry-run mode**: Preview execution without making changes
 - **Resilient execution**: Multi-phase execution with graceful cleanup handling
 - **Manual overrides**: Commands to manually manage stuck items
+- **Backlog refinement**: Iteratively improve backlog using AI agent suggestions
+
+## Artifact Management
+
+Ralph Loop stores all temporary files, logs, and artifacts in a `.ralph` folder in your project root:
+
+```
+.ralph/
+├── logs/
+│   ├── init/          # Initialization logs and responses
+│   ├── analyze/       # Analysis logs
+│   ├── refine/        # Refinement logs
+│   ├── qwen-stream/   # Qwen provider stream logs
+│   └── parse-failures/ # Failed parse attempts for debugging
+├── tmp/               # Temporary files during atomic operations
+├── backups/           # Timestamped backlog backups
+└── execution.lock     # Execution lock file
+```
+
+**Benefits:**
+- Single cleanup: `rm -rf .ralph` removes all ralph-loop artifacts
+- Single gitignore: Add `.ralph/` once to `.gitignore`
+- Clear ownership: Everything in `.ralph` belongs to ralph-loop
+- Better organization: Logs, temps, and backups are separated
+
+**Migration:** If you have an existing project with `logs/ralph/` or `.ralph-loop.lock`, they will be automatically migrated to `.ralph/` on first run.
 
 ## Installation
 
@@ -48,7 +75,7 @@ The fastest way to get started is to initialize a backlog from a natural languag
 ```bash
 cd ~/projects/my-new-project
 git init
-ralph --init "Build a web scraper in Python that extracts article titles from news sites"
+ralph init "Build a web scraper in Python that extracts article titles from news sites"
 ```
 
 This will:
@@ -60,6 +87,8 @@ This will:
 Then run Ralph Loop to execute the backlog:
 
 ```bash
+ralph run
+# or simply:
 ralph
 ```
 
@@ -67,13 +96,13 @@ ralph
 
 ```bash
 # Use Claude Code for roadmap generation
-ralph --init "Build a REST API with FastAPI" --provider claude
+ralph init "Build a REST API with FastAPI" --provider claude
 
 # Use Codex
-ralph --init "Create a CLI tool for file management" --provider codex
+ralph init "Create a CLI tool for file management" --provider codex
 
 # Preview without creating files
-ralph --init "Build a todo app" --dry-run
+ralph init "Build a todo app" --dry-run
 ```
 
 ### Basic usage
@@ -97,37 +126,52 @@ ralph --project ~/projects/your-project
 
 ```bash
 # Initialize backlog from prompt
-ralph --init "Project description"
+ralph init "Project description"
+
+# Analyze backlog for automation readiness
+ralph analyze
+
+# Save analysis to file
+ralph analyze --save-analysis
 
 # Validate backlog without executing
-ralph --validate-only
+ralph validate
 
 # Show next item to be executed
-ralph --show-next
+ralph show-next
 
 # List available providers
-ralph --list-providers
+ralph list-providers
 
 # Use specific provider (default: qwen)
-ralph --provider claude
-ralph --provider codex
+ralph --provider claude run
+ralph --provider codex init "Project description"
 
 # Dry-run mode (show what would be executed)
-ralph --dry-run
+ralph --dry-run run
 
 # Limit iterations
-ralph --max-iterations 5
+ralph run --max-iterations 5
 
 # Auto-push commits to remote
-ralph --auto-push
+ralph run --auto-push
+
+# Continue on work phase failures (useful for agent cancellations)
+ralph run --continue-on-error
 
 # Override backlog location
-ralph --backlog /path/to/custom-backlog.json
+ralph --backlog /path/to/custom-backlog.json run
 
 # Manual override commands (for stuck items)
-ralph --mark-complete ITEM-ID      # Mark item as done (bypasses validation)
-ralph --mark-ready ITEM-ID         # Mark item as ready for validation
-ralph --reset-item ITEM-ID         # Reset item back to todo status
+ralph mark-complete ITEM-ID      # Mark item as done (bypasses validation)
+ralph mark-ready ITEM-ID         # Mark item as ready for validation
+ralph reset-item ITEM-ID         # Reset item back to todo status
+
+# Run health checks
+ralph doctor
+
+# Check with project-specific validation
+ralph --project ~/projects/your-project doctor
 ```
 
 ## Resilient Execution
@@ -180,13 +224,93 @@ If an item gets stuck, use manual override commands:
 
 ```bash
 # Item stuck in in_progress after agent crash
-ralph --mark-ready ITEM-ID
+ralph mark-ready ITEM-ID
 
 # Item stuck in ready_for_validation, but work is actually done
-ralph --mark-complete ITEM-ID
+ralph mark-complete ITEM-ID
 
 # Need to re-run an item from scratch
-ralph --reset-item ITEM-ID
+ralph reset-item ITEM-ID
+```
+
+## Agent Cancellation Handling
+
+Ralph Loop automatically detects when an agent (Qwen, Claude Code, Codex) is cancelled by the user and handles it gracefully:
+
+**Automatic Detection**:
+- When an agent is cancelled during work phase, Ralph Loop detects the cancellation
+- The item remains in `in_progress` status (not marked as failed)
+- You can retry by running Ralph Loop again, or use `--reset-item` to start over
+
+**Continue on Error**:
+- Use `--continue-on-error` to make Ralph Loop continue even when work phase fails
+- Useful for handling transient failures or when you want to skip problematic items
+- Without this flag, Ralph Loop stops on work phase failures (default behavior)
+
+```bash
+# Continue even if work phase fails
+ralph run --continue-on-error
+```
+
+**Example scenario**:
+1. Agent starts working on an item
+2. You cancel the agent (Ctrl+C or tool cancellation)
+3. Ralph Loop detects the cancellation and logs it
+4. Item stays in `in_progress` status
+5. Next run of Ralph Loop will retry the same item
+
+## Health Checks
+
+Use `ralph doctor` to verify your environment is correctly configured:
+
+```bash
+ralph doctor
+```
+
+This checks:
+- System dependencies (Python, Git, jsonschema)
+- Provider installation (Qwen, Claude Code, Codex)
+- Provider authentication status
+- Project setup (when --project specified)
+
+Each check shows:
+- ✓ Pass - Check succeeded
+- ✗ Fail - Check failed (with suggestion)
+- ⚠ Warning - Non-critical issue
+- ○ Skip - Check not applicable
+
+Exit code 0 if all critical checks pass, 1 if any fail.
+
+Example output:
+
+```
+Ralph Loop Health Check
+=======================
+
+System Dependencies
+  ✓ Python version: Python 3.12.3 (>= 3.9 required)
+  ✓ Git installed: Git 2.43.0
+  ✓ Git user.name: Configured
+  ✓ Git user.email: Configured
+  ✓ jsonschema library: Installed
+
+Provider Installation
+  ✓ Qwen CLI: Installed
+  ✓ Claude Code CLI: Installed
+  ✗ Codex CLI: Not found
+    → Install Codex CLI
+
+Provider Authentication
+  ✓ Qwen authentication: Authenticated
+  ✓ Claude Code authentication: Authenticated
+  ○ Codex authentication: Skipped (not installed)
+
+Summary
+-------
+1 error(s) found.
+
+Critical issues:
+  - Codex CLI: Not found
 ```
 
 ## Git Integration
@@ -221,7 +345,7 @@ Exit criteria:
 Use `--auto-push` to automatically push commits to remote:
 
 ```bash
-ralph --auto-push
+ralph run --auto-push
 ```
 
 This will:
@@ -303,20 +427,20 @@ The `docs/backlog.json` file defines milestones and their execution order:
 
 ### Qwen (default)
 
-Local Qwen model via Ollama. Requires Ollama to be installed and running.
+Qwen Code CLI agent (Alibaba Cloud). Requires Qwen Code to be installed and authenticated.
 
 ```bash
 ralph --provider qwen
 ```
 
 **Requirements:**
-- Ollama installed and running
-- Qwen model pulled: `ollama pull qwen2.5-coder:32b`
+- Qwen Code CLI installed (`qwen --version` works)
+- Authenticated with Alibaba Cloud
 
 **Features:**
 - Real-time progress rendering with qwen_renderer
 - Streaming output with syntax highlighting
-- Local execution (no API costs)
+- Supports any Qwen model
 
 ### Claude Code
 
@@ -337,19 +461,20 @@ ralph --provider claude
 
 ### Codex
 
-OpenAI Codex API. Requires OpenAI API key.
+OpenAI Codex CLI. Requires Codex to be installed and authenticated.
 
 ```bash
 ralph --provider codex
 ```
 
 **Requirements:**
-- Valid OpenAI API key in `OPENAI_API_KEY` environment variable
+- Codex CLI installed (`codex --version` works)
+- Authenticated with OpenAI
 
 **Features:**
 - Best-effort progress rendering
 - Fast execution
-- API-based (no local setup)
+- API-based
 
 ## Execution Flow
 
@@ -366,10 +491,29 @@ ralph --provider codex
 Ralph Loop provides real-time progress visualization for supported providers:
 
 - **Qwen**: Full progress rendering with syntax highlighting, streaming output, and status updates
+  - **Complete message mode** (default): Groups assistant messages into coherent blocks for better readability
+  - **Partial streaming mode**: Shows character-by-character updates in real-time
 - **Claude Code**: Best-effort rendering (depends on Claude Code output format)
 - **Codex**: Best-effort rendering (depends on API response format)
 
 Progress logs are stored in `<project>/logs/ralph/qwen-stream/` for debugging.
+
+### Qwen Rendering Modes
+
+The Qwen renderer supports two modes:
+
+**Complete Message Mode (default)** - Recommended for better readability:
+- Waits for complete assistant messages before displaying
+- Eliminates fragmentation (no broken sentences or partial formatting)
+- Tool calls still show in real-time for progress feedback
+- Slight delay (~1 second) per message
+
+**Partial Streaming Mode** - For real-time character-by-character updates:
+- Shows text as it's generated
+- May fragment messages at sentence boundaries
+- More immediate feedback
+
+The default mode provides the best balance of readability and responsiveness. Raw logs always capture all events regardless of rendering mode.
 
 ## Lock File
 
@@ -399,12 +543,12 @@ Ralph Loop includes a comprehensive validator that checks:
 Run validation without executing:
 
 ```bash
-ralph --validate-only
+ralph validate
 ```
 
-## Backlog Initialization with `--init`
+## Backlog Initialization with `ralph init`
 
-The `--init` command generates a comprehensive project roadmap from a natural language prompt. This feature uses AI agents to break down your project into structured milestones suitable for autonomous implementation.
+The `ralph init` command generates a comprehensive project roadmap from a natural language prompt. This feature uses AI agents to break down your project into structured milestones suitable for autonomous implementation.
 
 ### How it works
 
@@ -418,22 +562,22 @@ The `--init` command generates a comprehensive project roadmap from a natural la
 
 ```bash
 # Web application
-ralph --init "Build a blog platform with user authentication and markdown support"
+ralph init "Build a blog platform with user authentication and markdown support"
 
 # CLI tool
-ralph --init "Create a command-line tool for managing TODO lists with SQLite storage"
+ralph init "Create a command-line tool for managing TODO lists with SQLite storage"
 
 # Library
-ralph --init "Develop a Python library for parsing and validating JSON schemas"
+ralph init "Develop a Python library for parsing and validating JSON schemas"
 
 # Data pipeline
-ralph --init "Build an ETL pipeline that extracts data from CSV files and loads into PostgreSQL"
+ralph init "Build an ETL pipeline that extracts data from CSV files and loads into PostgreSQL"
 
 # With specific provider
-ralph --init "Build a REST API with FastAPI" --provider claude
+ralph init "Build a REST API with FastAPI" --provider claude
 
 # Preview without creating files
-ralph --init "Build a calculator app" --dry-run
+ralph init "Build a calculator app" --dry-run
 ```
 
 ### Tips for effective prompts
@@ -478,7 +622,7 @@ After generation, you can manually edit `docs/backlog.json` to:
 Then validate your changes:
 
 ```bash
-ralph --validate-only
+ralph validate
 ```
 
 ### Debug output
@@ -490,6 +634,142 @@ All initialization attempts save debug information to `logs/ralph/init/`:
 
 This helps troubleshoot issues with agent responses or parsing.
 
+## Backlog Analysis with `ralph analyze`
+
+The `ralph analyze` command evaluates whether a backlog is suitable for full-auto long-running execution. It uses AI agents to assess the backlog across 9 dimensions and provides actionable recommendations for improvement.
+
+### How it works
+
+1. Loads and validates the backlog.json
+2. Invokes an AI agent with the backlog content and project directory path
+3. Agent dynamically assesses environment compatibility and agent capabilities
+4. Returns structured JSON with metrics, scores, issues, and recommendations
+5. Optionally saves analysis to `.ralph/backlog-analysis.json`
+
+### Nine-Metric Evaluation Framework
+
+1. **Clarity (15% weight)** - Clear titles, why statements, deliverables, exit criteria
+2. **Completeness (10% weight)** - All required fields, adequate deliverables/criteria
+3. **Automation-Readiness (20% weight)** - Executable validation commands, verifiable deliverables
+4. **Dependency Structure (10% weight)** - Well-defined dependencies, parallelization opportunities
+5. **Risk Awareness (10% weight)** - Risks identified with mitigation strategies
+6. **Granularity (10% weight)** - Appropriately sized items (5-15 total)
+7. **Priority Alignment (5% weight)** - P0=foundation, P1=core, P2=enhancements, P3=polish
+8. **Environment Compatibility (15% weight)** - Tech stack requirements match available tools/runtimes
+9. **Agent Capability Alignment (5% weight)** - Tasks within AI agent's operational permissions
+
+**Overall Score:** Weighted average with 75/100 threshold for "ready for auto"
+
+### Usage examples
+
+```bash
+# Basic analysis (outputs JSON to stdout)
+ralph analyze
+
+# Save analysis to .ralph/backlog-analysis.json
+ralph analyze --save-analysis
+
+# Use different provider
+ralph analyze --provider claude
+
+# Preview without executing
+ralph analyze --dry-run
+
+# Analyze specific backlog
+ralph --backlog /path/to/backlog.json analyze
+```
+
+### Iterative improvement workflow
+
+```bash
+# 1. Generate initial backlog
+ralph init "Build a task management API with React frontend"
+
+# 2. Analyze for readiness
+ralph analyze --save-analysis
+
+# 3. Review recommendations
+jq '.recommendations' .ralph/backlog-analysis.json
+
+# 4. Check environment compatibility
+jq '.metrics.environment_compatibility' .ralph/backlog-analysis.json
+
+# 5. Check capability flags
+jq '.metrics.agent_capability_alignment.permission_flags' .ralph/backlog-analysis.json
+
+# 6. Edit backlog based on suggestions
+vim docs/backlog.json
+
+# 7. Re-analyze to verify improvements
+ralph analyze
+
+# 8. When ready_for_auto is true, execute
+ralph run --max-iterations 10
+```
+
+### CI/CD integration
+
+```bash
+# Pre-flight check before production run
+ralph analyze > analysis.json
+
+READY=$(jq -r '.ready_for_auto' analysis.json)
+if [ "$READY" = "true" ]; then
+  ralph run --max-iterations 10
+else
+  echo "Backlog needs improvement:"
+  jq '.recommendations' analysis.json
+  exit 1
+fi
+```
+
+### JSON output structure
+
+The analysis returns structured JSON with:
+
+- `version`: Schema version
+- `analyzed_at`: Timestamp
+- `backlog_path`: Path to analyzed backlog
+- `tech_stack_detected`: Detected technologies (backend, database, tests, frontend)
+- `summary`: Item counts by priority and status
+- `metrics`: 9 metrics with scores (0-100), weights, and findings
+- `overall_score`: Weighted average
+- `threshold`: Readiness threshold (75)
+- `ready_for_auto`: Boolean decision
+- `issues`: Structured list of problems (severity, category, item_id, message)
+- `recommendations`: Actionable improvement suggestions
+- `follow_up_prompt`: Detailed prompt for improving the backlog
+
+### Environment compatibility assessment
+
+The agent dynamically checks for required tools by:
+1. Parsing backlog items to identify tech stack requirements
+2. Running bash commands to check for tools (e.g., `dotnet --version`, `node --version`)
+3. Comparing requirements vs. availability
+4. Reporting missing tools with specific item IDs
+
+Example for .NET + React stack:
+- Detects ".NET 10 SDK" if backlog mentions ASP.NET Core
+- Detects "Node.js" if backlog mentions React/Vite
+- Checks for xUnit via `dotnet test --help`
+- Checks for Vitest via package.json or `npm list vitest`
+
+### Agent capability assessment
+
+The agent analyzes required operations and sets permission flags:
+- `requires_network`: true if items need external API calls or package downloads
+- `requires_destructive_ops`: true if items include file deletion or database drops
+- `requires_system_admin`: true if items need elevated permissions
+- `requires_external_services`: true if items depend on third-party APIs
+
+These flags enable automated decision-making in CI/CD pipelines.
+
+### Debug output
+
+Analysis attempts save debug information to `logs/ralph/analyze/`:
+- `analysis-*.json`: The temp output file from the agent
+- `failed-analysis-parse-*.txt`: Responses that failed to parse (if any)
+
 ## Troubleshooting
 
 ### "Backlog not found"
@@ -500,16 +780,16 @@ Ensure `docs/backlog.json` exists in the project directory:
 ls docs/backlog.json
 ```
 
-Or use `--init` to generate one:
+Or use `ralph init` to generate one:
 
 ```bash
-ralph --init "Your project description"
+ralph init "Your project description"
 ```
 
 Or specify a custom location:
 
 ```bash
-ralph --backlog /path/to/backlog.json
+ralph --backlog /path/to/backlog.json run
 ```
 
 ### "Lock file exists"
@@ -530,16 +810,16 @@ rm .ralph-loop.lock
 
 Ensure the provider is installed and available:
 
-- **Qwen**: `ollama list` should show qwen2.5-coder:32b
+- **Qwen**: `qwen --version` should work and be authenticated
 - **Claude Code**: `claude --version` should work
-- **Codex**: `echo $OPENAI_API_KEY` should show your API key
+- **Codex**: `codex --version` should work and be authenticated
 
 ### "Validation failed"
 
 Run validation to see specific errors:
 
 ```bash
-ralph --validate-only
+ralph validate
 ```
 
 Fix the reported issues in `docs/backlog.json` and try again.
@@ -589,12 +869,60 @@ PROVIDERS = {
 3. Test the new provider:
 
 ```bash
-ralph --provider my-provider --dry-run
+ralph --provider my-provider run --dry-run
 ```
 
 ## License
 
 MIT
+
+## Migration Guide: Flag-based to Subcommand Syntax
+
+Ralph Loop has transitioned from flag-based commands to subcommands for better clarity and discoverability. Here's how to update your commands:
+
+### Command Mapping
+
+| Old Syntax (Deprecated) | New Syntax |
+|------------------------|------------|
+| `ralph --init "prompt"` | `ralph init "prompt"` |
+| `ralph --doctor` | `ralph doctor` |
+| `ralph --analyze-backlog` | `ralph analyze` |
+| `ralph --refine-backlog "prompt"` | `ralph refine "prompt"` |
+| `ralph --improve-backlog` | `ralph improve` |
+| `ralph --validate-only` | `ralph validate` |
+| `ralph --show-next` | `ralph show-next` |
+| `ralph --list-providers` | `ralph list-providers` |
+| `ralph --mark-complete ID` | `ralph mark-complete ID` |
+| `ralph --mark-ready ID` | `ralph mark-ready ID` |
+| `ralph --reset-item ID` | `ralph reset-item ID` |
+| `ralph` (default) | `ralph run` or `ralph` |
+| `ralph --max-iterations 10` | `ralph run --max-iterations 10` |
+| `ralph --auto-push` | `ralph run --auto-push` |
+
+### Key Changes
+
+1. **Commands are now subcommands** - No more `--` prefix for actions
+2. **Global options before subcommand** - `ralph --provider claude init "prompt"`
+3. **Command-specific options after subcommand** - `ralph run --max-iterations 10`
+4. **Better help text** - `ralph COMMAND --help` shows command-specific options
+
+### Examples
+
+**Before:**
+```bash
+ralph --init "Build a web scraper"
+ralph --analyze-backlog --save-analysis
+ralph --max-iterations 5 --auto-push
+ralph --mark-complete ITEM-1
+```
+
+**After:**
+```bash
+ralph init "Build a web scraper"
+ralph analyze --save-analysis
+ralph run --max-iterations 5 --auto-push
+ralph mark-complete ITEM-1
+```
 
 ## Contributing
 
