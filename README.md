@@ -19,30 +19,7 @@ Ralph Loop is a standalone tool that executes backlog items autonomously using A
 - **Manual overrides**: Commands to manually manage stuck items
 - **Backlog refinement**: Iteratively improve backlog using AI agent suggestions
 
-## Artifact Management
-
-Ralph Loop stores all temporary files, logs, and artifacts in a `.ralph` folder in your project root:
-
-```
-.ralph/
-├── logs/
-│   ├── init/          # Initialization logs and responses
-│   ├── analyze/       # Analysis logs
-│   ├── refine/        # Refinement logs
-│   ├── qwen-stream/   # Qwen provider stream logs
-│   └── parse-failures/ # Failed parse attempts for debugging
-├── tmp/               # Temporary files during atomic operations
-├── backups/           # Timestamped backlog backups
-└── execution.lock     # Execution lock file
-```
-
-**Benefits:**
-- Single cleanup: `rm -rf .ralph` removes all ralph-loop artifacts
-- Single gitignore: Add `.ralph/` once to `.gitignore`
-- Clear ownership: Everything in `.ralph` belongs to ralph-loop
-- Better organization: Logs, temps, and backups are separated
-
-**Migration:** If you have an existing project with `logs/ralph/` or `.ralph-loop.lock`, they will be automatically migrated to `.ralph/` on first run.
+For advanced topics like resilient execution, error handling, and health checks, see the [Advanced Guide](docs/ADVANCED.md).
 
 ## Installation
 
@@ -172,145 +149,6 @@ ralph doctor
 
 # Check with project-specific validation
 ralph --project ~/projects/your-project doctor
-```
-
-## Resilient Execution
-
-Ralph Loop uses multi-phase execution to handle transient failures gracefully:
-
-### Execution Phases
-
-1. **Work Phase** (`todo` → `in_progress`)
-   - Agent implements the milestone
-   - Creates code, tests, documentation
-   - On success: transitions to `ready_for_validation`
-
-2. **Validation Phase** (`ready_for_validation` → `done`)
-   - Runs validation commands
-   - Separates critical validation from cleanup
-   - On success: marks item as `done`
-
-### Graceful Cleanup Handling
-
-Validation commands are classified as either **critical** or **cleanup**:
-
-- **Critical commands**: Must pass for validation to succeed (e.g., `dotnet test`, `pytest`)
-- **Cleanup commands**: Best-effort, failures don't block completion (e.g., `pkill`, `docker stop`)
-
-Cleanup commands are automatically detected by pattern matching:
-- `pkill`, `killall`, `kill`
-- `docker stop`, `docker rm`
-- `npm stop`, `dotnet stop`
-- `rm -rf`
-
-Example validation with cleanup:
-```json
-{
-  "validation": {
-    "commands": [
-      "dotnet test",              // Critical - must pass
-      "curl http://localhost:5000", // Critical - must pass
-      "pkill -f 'dotnet run'"     // Cleanup - failure is non-blocking
-    ]
-  }
-}
-```
-
-If the cleanup command fails (e.g., process already stopped), the item is still marked as done.
-
-### Manual Recovery
-
-If an item gets stuck, use manual override commands:
-
-```bash
-# Item stuck in in_progress after agent crash
-ralph mark-ready ITEM-ID
-
-# Item stuck in ready_for_validation, but work is actually done
-ralph mark-complete ITEM-ID
-
-# Need to re-run an item from scratch
-ralph reset-item ITEM-ID
-```
-
-## Agent Cancellation Handling
-
-Ralph Loop automatically detects when an agent (Qwen, Claude Code, Codex) is cancelled by the user and handles it gracefully:
-
-**Automatic Detection**:
-- When an agent is cancelled during work phase, Ralph Loop detects the cancellation
-- The item remains in `in_progress` status (not marked as failed)
-- You can retry by running Ralph Loop again, or use `--reset-item` to start over
-
-**Continue on Error**:
-- Use `--continue-on-error` to make Ralph Loop continue even when work phase fails
-- Useful for handling transient failures or when you want to skip problematic items
-- Without this flag, Ralph Loop stops on work phase failures (default behavior)
-
-```bash
-# Continue even if work phase fails
-ralph run --continue-on-error
-```
-
-**Example scenario**:
-1. Agent starts working on an item
-2. You cancel the agent (Ctrl+C or tool cancellation)
-3. Ralph Loop detects the cancellation and logs it
-4. Item stays in `in_progress` status
-5. Next run of Ralph Loop will retry the same item
-
-## Health Checks
-
-Use `ralph doctor` to verify your environment is correctly configured:
-
-```bash
-ralph doctor
-```
-
-This checks:
-- System dependencies (Python, Git, jsonschema)
-- Provider installation (Qwen, Claude Code, Codex)
-- Provider authentication status
-- Project setup (when --project specified)
-
-Each check shows:
-- ✓ Pass - Check succeeded
-- ✗ Fail - Check failed (with suggestion)
-- ⚠ Warning - Non-critical issue
-- ○ Skip - Check not applicable
-
-Exit code 0 if all critical checks pass, 1 if any fail.
-
-Example output:
-
-```
-Ralph Loop Health Check
-=======================
-
-System Dependencies
-  ✓ Python version: Python 3.12.3 (>= 3.9 required)
-  ✓ Git installed: Git 2.43.0
-  ✓ Git user.name: Configured
-  ✓ Git user.email: Configured
-  ✓ jsonschema library: Installed
-
-Provider Installation
-  ✓ Qwen CLI: Installed
-  ✓ Claude Code CLI: Installed
-  ✗ Codex CLI: Not found
-    → Install Codex CLI
-
-Provider Authentication
-  ✓ Qwen authentication: Authenticated
-  ✓ Claude Code authentication: Authenticated
-  ○ Codex authentication: Skipped (not installed)
-
-Summary
--------
-1 error(s) found.
-
-Critical issues:
-  - Codex CLI: Not found
 ```
 
 ## Git Integration
@@ -707,22 +545,6 @@ ralph analyze
 ralph run --max-iterations 10
 ```
 
-### CI/CD integration
-
-```bash
-# Pre-flight check before production run
-ralph analyze > analysis.json
-
-READY=$(jq -r '.ready_for_auto' analysis.json)
-if [ "$READY" = "true" ]; then
-  ralph run --max-iterations 10
-else
-  echo "Backlog needs improvement:"
-  jq '.recommendations' analysis.json
-  exit 1
-fi
-```
-
 ### JSON output structure
 
 The analysis returns structured JSON with:
@@ -824,6 +646,31 @@ ralph validate
 
 Fix the reported issues in `docs/backlog.json` and try again.
 
+## Artifact Management
+
+Ralph Loop stores all temporary files, logs, and artifacts in a `.ralph` folder in your project root:
+
+```
+.ralph/
+├── logs/
+│   ├── init/          # Initialization logs and responses
+│   ├── analyze/       # Analysis logs
+│   ├── refine/        # Refinement logs
+│   ├── qwen-stream/   # Qwen provider stream logs
+│   └── parse-failures/ # Failed parse attempts for debugging
+├── tmp/               # Temporary files during atomic operations
+├── backups/           # Timestamped backlog backups
+└── execution.lock     # Execution lock file
+```
+
+**Benefits:**
+- Single cleanup: `rm -rf .ralph` removes all ralph-loop artifacts
+- Single gitignore: Add `.ralph/` once to `.gitignore`
+- Clear ownership: Everything in `.ralph` belongs to ralph-loop
+- Better organization: Logs, temps, and backups are separated
+
+**Migration:** If you have an existing project with `logs/ralph/` or `.ralph-loop.lock`, they will be automatically migrated to `.ralph/` on first run.
+
 ## Development
 
 ### Running tests
@@ -875,54 +722,6 @@ ralph --provider my-provider run --dry-run
 ## License
 
 MIT
-
-## Migration Guide: Flag-based to Subcommand Syntax
-
-Ralph Loop has transitioned from flag-based commands to subcommands for better clarity and discoverability. Here's how to update your commands:
-
-### Command Mapping
-
-| Old Syntax (Deprecated) | New Syntax |
-|------------------------|------------|
-| `ralph --init "prompt"` | `ralph init "prompt"` |
-| `ralph --doctor` | `ralph doctor` |
-| `ralph --analyze-backlog` | `ralph analyze` |
-| `ralph --refine-backlog "prompt"` | `ralph refine "prompt"` |
-| `ralph --improve-backlog` | `ralph improve` |
-| `ralph --validate-only` | `ralph validate` |
-| `ralph --show-next` | `ralph show-next` |
-| `ralph --list-providers` | `ralph list-providers` |
-| `ralph --mark-complete ID` | `ralph mark-complete ID` |
-| `ralph --mark-ready ID` | `ralph mark-ready ID` |
-| `ralph --reset-item ID` | `ralph reset-item ID` |
-| `ralph` (default) | `ralph run` or `ralph` |
-| `ralph --max-iterations 10` | `ralph run --max-iterations 10` |
-| `ralph --auto-push` | `ralph run --auto-push` |
-
-### Key Changes
-
-1. **Commands are now subcommands** - No more `--` prefix for actions
-2. **Global options before subcommand** - `ralph --provider claude init "prompt"`
-3. **Command-specific options after subcommand** - `ralph run --max-iterations 10`
-4. **Better help text** - `ralph COMMAND --help` shows command-specific options
-
-### Examples
-
-**Before:**
-```bash
-ralph --init "Build a web scraper"
-ralph --analyze-backlog --save-analysis
-ralph --max-iterations 5 --auto-push
-ralph --mark-complete ITEM-1
-```
-
-**After:**
-```bash
-ralph init "Build a web scraper"
-ralph analyze --save-analysis
-ralph run --max-iterations 5 --auto-push
-ralph mark-complete ITEM-1
-```
 
 ## Contributing
 
