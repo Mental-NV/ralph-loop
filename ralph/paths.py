@@ -125,13 +125,16 @@ class RalphPaths:
             print("  Migration complete.", file=sys.stderr)
             print(file=sys.stderr)
 
-    def ensure_gitignore_entry(self) -> None:
+    def ensure_gitignore_entry(self, verbose: bool = False) -> None:
         """
         Ensure .ralph/ is in .gitignore.
 
         Creates .gitignore if it doesn't exist, or appends .ralph/ entry if missing.
         Handles both .ralph and .ralph/ as valid existing entries.
         Silently continues on errors (prints warning to stderr).
+
+        Args:
+            verbose: If True, print status messages to stdout
         """
         gitignore_path = self.project_dir / ".gitignore"
 
@@ -164,8 +167,14 @@ class RalphPaths:
                 with open(gitignore_path, 'a', encoding='utf-8') as f:
                     f.write(entry)
 
-                print("  ✓ Added .ralph/ to .gitignore", file=sys.stderr)
+                if verbose:
+                    print("✓ Added .ralph/ to .gitignore")
+                else:
+                    print("  ✓ Added .ralph/ to .gitignore", file=sys.stderr)
+            else:
+                if verbose:
+                    print("✓ .gitignore already contains .ralph/")
 
         except Exception as e:
-            print(f"  Warning: Failed to add .ralph/ to .gitignore: {e}", file=sys.stderr)
-            print(f"  You can manually add '.ralph/' to your .gitignore file.", file=sys.stderr)
+            print(f"Warning: Failed to update .gitignore: {e}", file=sys.stderr)
+            print(f"Please manually add '.ralph/' to your .gitignore file.", file=sys.stderr)

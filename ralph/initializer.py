@@ -157,6 +157,10 @@ class BacklogInitializer:
                 self._save_backlog(backlog)
                 print(f"✓ Backlog saved to {self.backlog_path}")
 
+                # Ensure .gitignore has .ralph/ entry
+                print("\nConfiguring .gitignore...")
+                self.paths.ensure_gitignore_entry(verbose=True)
+
             # Step 7: Summary
             self._print_summary(backlog)
 
@@ -379,7 +383,7 @@ class BacklogInitializer:
         print(f"\nNext steps:")
         print(f"  1. Review the generated backlog: {self.backlog_path}")
         print(f"  2. Make any necessary adjustments")
-        print(f"  3. Run: ralph --project {self.project_dir}")
+        print(f"  3. Run: ralph run")
 
     def _timestamp(self) -> str:
         """
