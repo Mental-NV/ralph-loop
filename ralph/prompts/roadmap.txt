@@ -88,54 +88,73 @@ Validate your JSON against this schema before writing the file.
 - Minimize dependencies to allow parallel work where possible
 
 **Deliverables:**
-- List concrete, verifiable outputs (files, functions, tests, docs)
-- Be specific: "Create src/parser.py with parse() function" not "Write parser"
-- Each deliverable should be checkable by an agent
+- Describe WHAT capabilities or features need to exist, not HOW to implement them
+- Use very high-level feature descriptions without technical implementation details
+- Avoid specific file names, class names, framework choices, or technical structure
+- Think in terms of user-facing capabilities and system behaviors
+- Examples:
+  - ✅ "User authentication capability"
+  - ✅ "Data persistence layer"
+  - ✅ "Task management functionality"
+  - ❌ "Create UserController.cs with Login() method"
+  - ❌ "Authentication endpoints at /api/auth/*"
+  - ❌ "SQLite database with tasks table"
 
 **Exit Criteria:**
-- Define how to verify the milestone is complete
-- Make criteria testable and objective
-- Include both functional and quality checks
-- Examples: "All tests pass", "Code follows style guide", "API returns expected responses"
+- Define how to verify the milestone is complete using outcome-based criteria
+- Focus on behavior and capabilities, not implementation details
+- Make criteria testable and objective, but describe the outcome not the test method
+- Examples:
+  - ✅ "Users can authenticate and receive access tokens"
+  - ✅ "Task data persists across application restarts"
+  - ✅ "All core functionality is covered by automated tests"
+  - ❌ "UserController.Login() returns JWT token"
+  - ❌ "Database contains users table with password_hash column"
 
 **Risks:**
 - Identify potential blockers or challenges
 - Suggest mitigation strategies where applicable
 - Be realistic about complexity
 
-**Validation Commands:**
-- Provide shell commands to verify completion
-- Examples: "pytest tests/", "npm test", "python -m mypy src/"
-- Commands should be runnable in the project directory
+**Validation Approach:**
+- Describe HOW to verify completion conceptually, letting agents choose appropriate tools
+- Focus on what needs to be validated, not specific commands or tools
+- Agents will determine the best validation method (API testing tools, unit tests, manual verification, etc.)
+- Examples:
+  - ✅ "Verify user authentication flow end-to-end"
+  - ✅ "Validate task CRUD operations with various inputs"
+  - ✅ "Confirm data persistence across application lifecycle"
+  - ❌ "Run: curl -X POST http://localhost:5000/api/auth/login"
+  - ❌ "Execute: pytest tests/test_auth.py"
+  - ❌ "Check HTTP 200 response from GET /api/tasks"
 
 # Example Milestone
 
 {{
-  "title": "Setup Project Structure",
-  "why": "Establishes foundation for all subsequent development work",
+  "title": "Project Foundation",
+  "why": "Establishes the basic structure and tooling needed for development",
   "priority": "P0",
   "dependsOn": [],
   "deliverables": [
-    "Create project directory structure (src/, tests/, docs/)",
-    "Initialize git repository with .gitignore",
-    "Create requirements.txt or package.json with dependencies",
-    "Setup virtual environment or node_modules",
-    "Create README.md with project overview"
+    "Project structure and organization",
+    "Development environment setup",
+    "Version control initialization",
+    "Basic documentation"
   ],
   "exitCriteria": [
-    "Project structure follows language best practices",
-    "All dependencies install without errors",
-    "Git repository is initialized and clean",
-    "README documents project purpose and setup"
+    "Development environment is functional and reproducible",
+    "Project structure follows best practices for the chosen technology",
+    "Version control is properly configured",
+    "Documentation explains project purpose and setup process"
   ],
   "risks": [
-    "Dependency conflicts - mitigate by pinning versions"
+    "Dependency conflicts - ensure compatibility between major components"
   ],
   "validation": {{
     "commands": [
-      "ls -la",
-      "git status",
-      "test -f README.md"
+      "Verify development environment can be set up from scratch",
+      "Confirm all essential project files are present and organized",
+      "Validate version control is tracking appropriate files"
     ]
   }}
 }}

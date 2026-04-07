@@ -1,0 +1,63 @@
+You are analyzing a project description to determine the appropriate technology stack and application type.
+
+# Project Description
+{user_prompt}
+
+# Your Task
+Analyze the project description and determine:
+1. Application type (webapp, console app, library, CLI tool, API, mobile app, etc.)
+2. Technology stack (backend, frontend, database, testing frameworks)
+3. If not explicitly mentioned, recommend appropriate defaults
+
+Write your analysis as JSON to: {output_file}
+
+# Output JSON Schema
+Your output MUST conform to this exact JSON schema:
+
+```json
+{tech_stack_schema}
+```
+
+# Guidelines
+- If the user explicitly mentions technologies, use those
+- If not mentioned, recommend appropriate defaults based on:
+  - Application type
+  - Common best practices
+  - Ecosystem maturity
+- Default stack if nothing specified:
+  - Backend: .NET 10 (ASP.NET Core)
+  - Frontend: React + TypeScript + Vite
+  - Database: SQLite
+  - Testing: xUnit (backend), Vitest (frontend)
+- Be specific about versions where appropriate
+- Consider the application type when choosing defaults
+
+# Examples
+
+Input: "Build a REST API for task management"
+Output:
+```json
+{{
+  "app_type": "API",
+  "backend": ".NET 10 (ASP.NET Core)",
+  "frontend": null,
+  "database": "SQLite",
+  "testing": "xUnit",
+  "additional_tools": []
+}}
+```
+
+Input: "Create a web scraper in Python"
+Output:
+```json
+{{
+  "app_type": "console",
+  "backend": "Python 3.11",
+  "frontend": null,
+  "database": null,
+  "testing": "pytest",
+  "additional_tools": ["BeautifulSoup4", "requests"]
+}}
+```
+
+Write the JSON to the specified file now.

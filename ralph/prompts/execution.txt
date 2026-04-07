@@ -2,6 +2,9 @@ Execute backlog item: {title}
 
 **Why:** {why}
 
+**Architecture Context:**
+See docs/ARCHITECTURE.md for tech stack, patterns, and best practices to follow.
+
 **Deliverables:**
 {deliverables}
 
@@ -11,7 +14,7 @@ Execute backlog item: {title}
 **Risks:**
 {risks}
 
-**Validation Commands:**
+**Validation Approach:**
 {validation_commands}
 
-Please implement this milestone following the deliverables and exit criteria.
+Please implement this milestone following the deliverables, exit criteria, and architectural guidelines.

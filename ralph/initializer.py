@@ -129,12 +129,59 @@ class BacklogInitializer:
                 parsed_data = parse_roadmap_response(response, self.debug_dir)
             else:
                 # Read the file the agent created
-                import json
                 with open(temp_output, 'r', encoding='utf-8') as f:
                     parsed_data = json.load(f)
                 print(f"Successfully read roadmap from {temp_output}")
 
             print(f"Parsed {len(parsed_data.get('items', []))} milestones")
+
+            # Step 3.5: Detect tech stack
+            print("\nDetecting technology stack...")
+            from ralph.prompts import build_tech_stack_detection_prompt
+
+            tech_stack_output = self.debug_dir / f"tech-stack-{self._timestamp()}.json"
+            tech_stack_prompt = build_tech_stack_detection_prompt(user_prompt, str(tech_stack_output))
+
+            # Save tech stack prompt for debugging
+            tech_stack_prompt_file = self.debug_dir / f"tech-stack-prompt-{self._timestamp()}.txt"
+            tech_stack_prompt_file.write_text(tech_stack_prompt, encoding='utf-8')
+
+            tech_stack_response = self._invoke_provider(tech_stack_prompt, tech_stack_output)
+
+            # Read detected tech stack
+            if not tech_stack_output.exists():
+                print("Warning: Agent did not write tech stack file, using defaults...")
+                tech_stack = {
+                    "app_type": "webapp",
+                    "backend": ".NET 10 (ASP.NET Core)",
+                    "frontend": "React + TypeScript + Vite",
+                    "database": "SQLite",
+                    "testing": "xUnit",
+                    "additional_tools": []
+                }
+            else:
+                with open(tech_stack_output, 'r', encoding='utf-8') as f:
+                    tech_stack = json.load(f)
+
+            print(f"✓ Detected: {tech_stack['app_type']} with {tech_stack['backend']}")
+
+            # Step 3.6: Generate architecture document
+            print("\nGenerating architecture document...")
+            from ralph.prompts import build_architecture_prompt
+
+            arch_output = self.project_dir / "docs" / "ARCHITECTURE.md"
+            arch_prompt = build_architecture_prompt(user_prompt, tech_stack, str(arch_output))
+
+            # Save architecture prompt for debugging
+            arch_prompt_file = self.debug_dir / f"arch-prompt-{self._timestamp()}.txt"
+            arch_prompt_file.write_text(arch_prompt, encoding='utf-8')
+
+            arch_response = self._invoke_provider(arch_prompt, arch_output)
+
+            if arch_output.exists():
+                print(f"✓ Architecture document created at {arch_output}")
+            else:
+                print("Warning: Architecture document was not created")
 
             # Step 4: Transform to backlog
             print("\nTransforming to backlog format...")

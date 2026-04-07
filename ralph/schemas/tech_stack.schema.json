@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Tech Stack Detection Schema",
+  "description": "Schema for detected technology stack and application type",
+  "type": "object",
+  "required": ["app_type", "backend"],
+  "properties": {
+    "app_type": {
+      "type": "string",
+      "enum": ["webapp", "API", "console", "CLI", "library", "mobile", "desktop", "microservice"],
+      "description": "Type of application being built"
+    },
+    "backend": {
+      "type": "string",
+      "description": "Backend technology and version (e.g., '.NET 10', 'Python 3.11', 'Node.js 20')"
+    },
+    "frontend": {
+      "type": ["string", "null"],
+      "description": "Frontend technology if applicable (e.g., 'React + TypeScript + Vite')"
+    },
+    "database": {
+      "type": ["string", "null"],
+      "description": "Database technology if applicable (e.g., 'SQLite', 'PostgreSQL')"
+    },
+    "testing": {
+      "type": "string",
+      "description": "Testing framework (e.g., 'xUnit', 'pytest', 'Jest')"
+    },
+    "additional_tools": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Additional tools or libraries relevant to the project",
+      "default": []
+    }
+  }
+}

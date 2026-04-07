@@ -99,3 +99,66 @@ def build_refinement_prompt(backlog_json: str, user_prompt: str, output_file: st
                        user_prompt=user_prompt,
                        output_file=output_file,
                        schema=schema)
+
+
+def load_tech_stack_schema() -> str:
+    """
+    Load tech stack schema for inclusion in prompts.
+
+    Returns:
+        Formatted schema as string
+    """
+    from pathlib import Path
+
+    schema_path = Path(__file__).parent / "schemas" / "tech_stack.schema.json"
+    with open(schema_path, 'r', encoding='utf-8') as f:
+        schema = json.load(f)
+
+    return json.dumps(schema, indent=2)
+
+
+def build_tech_stack_detection_prompt(user_prompt: str, output_file: str) -> str:
+    """
+    Build meta-prompt for tech stack detection.
+
+    Returns a prompt that instructs the agent to:
+    1. Analyze the project description
+    2. Detect or recommend appropriate tech stack
+    3. Write structured JSON to a file
+
+    Args:
+        user_prompt: User's project description
+        output_file: Path where the agent should write the tech stack JSON
+
+    Returns:
+        Formatted prompt for the agent
+    """
+    tech_stack_schema = load_tech_stack_schema()
+    return _loader.load('tech_stack_detection',
+                       user_prompt=user_prompt,
+                       output_file=output_file,
+                       tech_stack_schema=tech_stack_schema)
+
+
+def build_architecture_prompt(user_prompt: str, tech_stack: dict, output_file: str) -> str:
+    """
+    Build meta-prompt for architecture document generation.
+
+    Returns a prompt that instructs the agent to:
+    1. Use the detected tech stack
+    2. Generate comprehensive ARCHITECTURE.md with best practices
+    3. Write markdown document to a file
+
+    Args:
+        user_prompt: User's project description
+        tech_stack: Detected tech stack dictionary
+        output_file: Path where the agent should write the architecture document
+
+    Returns:
+        Formatted prompt for the agent
+    """
+    tech_stack_str = json.dumps(tech_stack, indent=2)
+    return _loader.load('architecture',
+                       user_prompt=user_prompt,
+                       tech_stack=tech_stack_str,
+                       output_file=output_file)
