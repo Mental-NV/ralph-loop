@@ -340,7 +340,21 @@ def main():
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
         description="Ralph Loop - Provider-agnostic orchestration for agent-driven development",
-        epilog="YOLO mode (auto-approve all actions) is always enabled."
+        epilog="""
+Examples:
+  ralph init "Build a web scraper in Python"
+  ralph run --max-iterations 10 --auto-push
+  ralph analyze --save-analysis
+  ralph improve --threshold 80
+  ralph doctor
+  ralph mark-complete ITEM-1
+
+For detailed help on a specific command:
+  ralph COMMAND --help
+
+YOLO mode (auto-approve all actions) is always enabled.
+""",
+        formatter_class=argparse.RawDescriptionHelpFormatter
     )
 
     # Global arguments
@@ -378,7 +392,10 @@ def main():
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
 
     # ralph run
-    run_parser = subparsers.add_parser('run', help='Run main orchestration loop (default)')
+    run_parser = subparsers.add_parser(
+        'run',
+        help='Run main orchestration loop (default). Options: --max-iterations N, --auto-push, --continue-on-error'
+    )
     run_parser.add_argument(
         '--max-iterations',
         type=int,
@@ -398,14 +415,20 @@ def main():
     )
 
     # ralph init
-    init_parser = subparsers.add_parser('init', help='Initialize backlog from natural language prompt')
+    init_parser = subparsers.add_parser(
+        'init',
+        help='Initialize backlog from natural language prompt. Usage: ralph init PROMPT'
+    )
     init_parser.add_argument('prompt', type=str, help='Project description (e.g., "Build a web scraper in Python")')
 
     # ralph doctor
     subparsers.add_parser('doctor', help='Run health checks for providers and system dependencies')
 
     # ralph analyze
-    analyze_parser = subparsers.add_parser('analyze', help='Analyze backlog for automation readiness')
+    analyze_parser = subparsers.add_parser(
+        'analyze',
+        help='Analyze backlog for automation readiness. Options: --save-analysis'
+    )
     analyze_parser.add_argument(
         '--save-analysis',
         action='store_true',
@@ -413,11 +436,17 @@ def main():
     )
 
     # ralph refine
-    refine_parser = subparsers.add_parser('refine', help='Refine backlog using AI agent with given prompt')
+    refine_parser = subparsers.add_parser(
+        'refine',
+        help='Refine backlog using AI agent. Usage: ralph refine PROMPT'
+    )
     refine_parser.add_argument('prompt', type=str, help='Refinement instructions')
 
     # ralph improve
-    improve_parser = subparsers.add_parser('improve', help='Iteratively improve backlog until threshold is met')
+    improve_parser = subparsers.add_parser(
+        'improve',
+        help='Iteratively improve backlog until threshold is met. Options: --threshold SCORE, --max-improve-iterations N'
+    )
     improve_parser.add_argument(
         '--threshold',
         type=int,
@@ -443,15 +472,24 @@ def main():
     subparsers.add_parser('list-providers', help='List available providers and exit')
 
     # ralph mark-complete
-    mark_complete_parser = subparsers.add_parser('mark-complete', help='Manually mark an item as complete (bypasses validation)')
+    mark_complete_parser = subparsers.add_parser(
+        'mark-complete',
+        help='Manually mark an item as complete (bypasses validation). Usage: ralph mark-complete ITEM_ID'
+    )
     mark_complete_parser.add_argument('item_id', type=str, metavar='ITEM_ID', help='Item ID to mark as complete')
 
     # ralph mark-ready
-    mark_ready_parser = subparsers.add_parser('mark-ready', help='Manually mark an item as ready for validation')
+    mark_ready_parser = subparsers.add_parser(
+        'mark-ready',
+        help='Manually mark an item as ready for validation. Usage: ralph mark-ready ITEM_ID'
+    )
     mark_ready_parser.add_argument('item_id', type=str, metavar='ITEM_ID', help='Item ID to mark as ready')
 
     # ralph reset-item
-    reset_item_parser = subparsers.add_parser('reset-item', help='Reset an item back to todo status')
+    reset_item_parser = subparsers.add_parser(
+        'reset-item',
+        help='Reset an item back to todo status. Usage: ralph reset-item ITEM_ID'
+    )
     reset_item_parser.add_argument('item_id', type=str, metavar='ITEM_ID', help='Item ID to reset')
 
     args = parser.parse_args()
