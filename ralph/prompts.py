@@ -162,3 +162,27 @@ def build_architecture_prompt(user_prompt: str, tech_stack: dict, output_file: s
                        user_prompt=user_prompt,
                        tech_stack=tech_stack_str,
                        output_file=output_file)
+
+
+def build_architecture_refinement_prompt(architecture_path: str, user_prompt: str, output_file: str) -> str:
+    """
+    Build meta-prompt for architecture document refinement.
+
+    Returns a prompt that instructs the agent to:
+    1. Read the current architecture document
+    2. Apply the user's refinement instructions
+    3. Generate an improved architecture document
+    4. Write markdown document to a file
+
+    Args:
+        architecture_path: Path to current ARCHITECTURE.md
+        user_prompt: User's refinement instructions
+        output_file: Path where the agent should write the refined architecture
+
+    Returns:
+        Formatted prompt for the agent
+    """
+    return _loader.load('architecture_refinement',
+                       architecture_path=architecture_path,
+                       user_prompt=user_prompt,
+                       output_file=output_file)

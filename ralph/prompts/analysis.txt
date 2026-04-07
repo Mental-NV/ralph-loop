@@ -4,62 +4,94 @@ You are a software project analyst evaluating a backlog for autonomous AI agent 
 
 {backlog_json}
 
+# Architecture Document
+
+Read the architecture document at: {project_dir}/docs/ARCHITECTURE.md
+
+If the file exists, parse it to understand:
+- Technology stack and versions
+- Project structure and patterns
+- Testing strategy
+- Required tools and dependencies
+
+If the file doesn't exist, note this as a critical issue.
+
 # Project Directory
 
 {project_dir}
 
 # Your Task
 
-Analyze this backlog and evaluate its readiness for full-auto long-running execution by AI agents. Assess the quality, completeness, automation-readiness, environment compatibility, and agent capability alignment.
+Analyze this backlog and architecture, evaluating readiness for full-auto long-running execution by AI agents. Assess quality, abstraction level, architecture quality, environment compatibility, and alignment between backlog and architecture.
 
 Write your analysis as a JSON file to: {output_file}
 
 # Analysis Criteria
 
-Evaluate the backlog on these 9 dimensions (0-100 scores):
+Evaluate on these 11 dimensions (0-100 scores):
 
-## 1. Clarity (0-100, weight: 0.15)
-Are titles, why statements, deliverables, and exit criteria clear and specific?
+## 1. Clarity (0-100, weight: 0.125)
+Are titles, why statements, deliverables, and exit criteria clear and understandable?
 - Check for vague language ("implement stuff", "make it work")
 - Verify why statements explain rationale
-- Ensure deliverables are concrete and actionable
-- Confirm exit criteria are specific and measurable
+- Ensure deliverables describe capabilities clearly
+- Confirm exit criteria describe outcomes clearly
 
-## 2. Completeness (0-100, weight: 0.10)
+## 2. Completeness (0-100, weight: 0.083)
 Do items have all required fields? Are deliverables/exit criteria comprehensive?
 - All required fields present (id, title, status, priority, order)
 - Optional but important fields populated (why, deliverables, exitCriteria)
 - Adequate number of deliverables per item (suggest 2-5)
 - Adequate number of exit criteria per item (suggest 2-4)
 
-## 3. Automation-Readiness (0-100, weight: 0.20)
-Are validation commands present and executable?
-- Validation commands present for most items
-- Commands are executable (not pseudo-code)
-- Deliverables reference specific files/functions
-- Exit criteria can be verified programmatically
+## 3. Abstraction Level (0-100, weight: 0.167)
+**CRITICAL: Are backlog items high-level and feature-oriented?**
 
-## 4. Dependency Structure (0-100, weight: 0.10)
+Check for proper abstraction:
+- ✅ Deliverables describe WHAT capabilities/features need to exist
+- ✅ Exit criteria describe outcomes and behaviors
+- ✅ Validation approaches are conceptual (not specific commands)
+- ❌ NO specific file names (e.g., "UserController.cs", "src/parser.py")
+- ❌ NO specific class/function names (e.g., "Login() method", "parse() function")
+- ❌ NO framework-specific details (e.g., "POST /api/auth/login endpoint")
+- ❌ NO specific commands (e.g., "Run: curl http://localhost:5000")
+
+Examples of proper abstraction:
+- ✅ GOOD: "User authentication capability"
+- ❌ BAD: "Create UserController.cs with Login() method"
+- ✅ GOOD: "Data persistence layer"
+- ❌ BAD: "SQLite database with users table"
+- ✅ GOOD: "Verify user authentication flow end-to-end"
+- ❌ BAD: "Run: curl -X POST http://localhost:5000/api/auth/login"
+
+Score heavily based on abstraction level:
+- 90-100: All items are properly high-level
+- 70-89: Most items high-level, some slip into implementation details
+- 50-69: Mixed abstraction levels
+- 30-49: Most items have implementation details
+- 0-29: Items are implementation-specific
+
+## 4. Dependency Structure (0-100, weight: 0.083)
 Are dependencies well-defined? Reasonable parallelization?
 - Dependencies are necessary and sufficient
 - Reasonable parallelization opportunities
 - P0 items have minimal dependencies
 - No circular dependencies (already validated by schema)
 
-## 5. Risk Awareness (0-100, weight: 0.10)
+## 5. Risk Awareness (0-100, weight: 0.083)
 Are risks identified and mitigation strategies present?
 - Risks identified for complex items
 - Mitigation strategies included
 - Realistic assessment of complexity
 
-## 6. Granularity (0-100, weight: 0.10)
+## 6. Granularity (0-100, weight: 0.083)
 Are items appropriately sized?
 - Items completable in one focused session
 - Not too many tiny items (suggest 5-15 total)
 - Not too few massive items
 - Balanced distribution of work
 
-## 7. Priority Alignment (0-100, weight: 0.05)
+## 7. Priority Alignment (0-100, weight: 0.042)
 Do priorities make sense?
 - P0 items are infrastructure/foundation
 - P1 items are core features
@@ -67,43 +99,81 @@ Do priorities make sense?
 - P3 items are polish/nice-to-have
 - Dependencies respect priority ordering
 
-## 8. Environment Compatibility (0-100, weight: 0.15)
-**IMPORTANT: Dynamically assess environment based on backlog requirements**
+## 8. Environment Compatibility (0-100, weight: 0.125)
+**IMPORTANT: Read tech stack from docs/ARCHITECTURE.md, then check environment**
 
 Steps to evaluate:
-1. Parse backlog items to identify required tech stack (languages, tools, databases, services)
-2. Use bash commands to check for required tools in the environment
-3. Compare requirements vs. availability
-4. Score based on how many requirements are satisfied
+1. Read docs/ARCHITECTURE.md to identify required tools
+2. Parse technology stack section for languages, frameworks, databases, testing tools
+3. Use bash commands to check if required tools are installed
+4. Flag tools that require sudo/admin privileges (Playwright, PostgreSQL, Docker, system packages)
+5. Score based on availability of required tools
 
-Example checks (adapt based on actual backlog):
-- If backlog mentions ".NET" or "dotnet" → run `dotnet --version`
-- If backlog mentions "Node.js" or "npm" → run `node --version` and `npm --version`
-- If backlog mentions "Python" or "pip" → run `python --version` or `python3 --version`
-- If backlog mentions "PostgreSQL" → check for `psql` command
-- If backlog mentions "Docker" → check for `docker` command
-- If backlog mentions "xUnit" → check `dotnet test --help`
-- If backlog mentions "Vitest" → check for package.json or `npm list vitest`
+Example checks (adapt based on ARCHITECTURE.md):
+- If architecture specifies ".NET 10" → run `dotnet --version`
+- If architecture specifies "Node.js" → run `node --version` and `npm --version`
+- If architecture specifies "Python 3.11" → run `python3 --version`
+- If architecture specifies "PostgreSQL" → check for `psql` command (requires sudo to install)
+- If architecture specifies "Playwright" → check `npx playwright --version` (requires sudo for browser install)
+- If architecture specifies "Docker" → check `docker --version` (requires sudo)
+- If architecture specifies "xUnit" → check `dotnet test --help`
 
 Report findings:
 - List detected tools with versions
-- List missing tools with item IDs that require them
+- List missing tools (especially those requiring sudo/admin)
 - Provide available_tools and missing_tools arrays
+- Flag if missing tools block implementation
 
-## 9. Agent Capability Alignment (0-100, weight: 0.05)
-**IMPORTANT: Dynamically assess required operations**
+## 9. Architecture Quality (0-100, weight: 0.083)
+**IMPORTANT: Evaluate docs/ARCHITECTURE.md comprehensiveness**
+
+Check if ARCHITECTURE.md exists and contains:
+- ✅ Technology stack clearly specified with versions
+- ✅ Project structure defined (folder organization, naming conventions)
+- ✅ Architectural patterns explained (MVC, Clean Architecture, etc.)
+- ✅ Coding standards and conventions documented
+- ✅ Testing strategy defined (unit, integration, e2e)
+- ✅ Development guidelines (how to add features, structure components)
+- ✅ Best practices for the specific tech stack
+
+Score based on completeness:
+- 90-100: Comprehensive, actionable architecture document
+- 70-89: Good coverage, minor gaps
+- 50-69: Basic architecture, missing important sections
+- 30-49: Minimal architecture, lacks guidance
+- 0-29: Missing or severely incomplete
+
+If ARCHITECTURE.md doesn't exist, score 0 and flag as critical issue.
+
+## 10. Agent Capability Alignment (0-100, weight: 0.042)
+**IMPORTANT: Assess required operations from both backlog and ARCHITECTURE.md**
 
 Steps to evaluate:
-1. Parse backlog items to identify required operations
+1. Parse backlog items and ARCHITECTURE.md to identify required operations
 2. Assess if operations are within typical AI agent capabilities
 3. Flag operations requiring human approval or elevated permissions
-4. Return boolean flags for automated decision-making
 
 Permission flags to set:
-- requires_network: true if items need external API calls, package downloads (npm install, dotnet restore)
-- requires_destructive_ops: true if items include file deletion, database drops, rm -rf
+- requires_network: true if items need external API calls, package downloads
+- requires_destructive_ops: true if items include file deletion, database drops
 - requires_system_admin: true if items need sudo, elevated permissions
-- requires_external_services: true if items depend on third-party APIs or services
+- requires_external_services: true if items depend on third-party APIs
+
+## 11. Backlog-Architecture Alignment (0-100, weight: 0.083)
+**IMPORTANT: Check consistency between backlog and architecture**
+
+Evaluate alignment:
+- ✅ Backlog items are feasible given the tech stack in ARCHITECTURE.md
+- ✅ Architecture provides enough guidance to implement backlog items
+- ✅ No contradictions between backlog and architecture
+- ✅ Architecture addresses technical concerns implied by backlog
+- ✅ Tech stack in architecture supports all backlog requirements
+
+Examples of misalignment:
+- ❌ Backlog mentions "real-time features" but architecture has no WebSocket/SignalR
+- ❌ Backlog requires "data persistence" but architecture doesn't specify database
+- ❌ Backlog has "frontend" items but architecture only defines backend
+- ❌ Architecture specifies Python but backlog implies .NET features
 
 # Output Format
 
@@ -113,12 +183,14 @@ Write a JSON file with this exact structure:
   "version": "1.0.0",
   "analyzed_at": "<ISO 8601 timestamp>",
   "backlog_path": "<path to backlog>",
-  "tech_stack_detected": {{
-    "backend": ["<detected backend tech>"],
-    "database": ["<detected database>"],
-    "backend_tests": ["<detected test framework>"],
-    "frontend": ["<detected frontend tech>"],
-    "frontend_tests": ["<detected frontend test framework>"]
+  "architecture_path": "<path to ARCHITECTURE.md or null if missing>",
+  "architecture_exists": <true|false>,
+  "tech_stack_from_architecture": {{
+    "backend": "<backend tech from ARCHITECTURE.md>",
+    "frontend": "<frontend tech or null>",
+    "database": "<database or null>",
+    "testing": "<testing framework>",
+    "additional_tools": ["<tool1>", "<tool2>"]
   }},
   "summary": {{
     "total_items": <count>,
@@ -128,49 +200,60 @@ Write a JSON file with this exact structure:
   "metrics": {{
     "clarity": {{
       "score": <0-100>,
-      "weight": 0.15,
+      "weight": 0.125,
       "findings": ["<finding 1>", "<finding 2>", ...]
     }},
     "completeness": {{
       "score": <0-100>,
-      "weight": 0.10,
+      "weight": 0.083,
       "findings": [...]
     }},
-    "automation_readiness": {{
+    "abstraction_level": {{
       "score": <0-100>,
-      "weight": 0.20,
-      "findings": [...]
+      "weight": 0.167,
+      "findings": ["<finding 1>", "<finding 2>", ...],
+      "violations": [
+        {{"item_id": "<id>", "issue": "Contains specific file name: X"}},
+        {{"item_id": "<id>", "issue": "Contains specific command: Y"}}
+      ]
     }},
     "dependency_structure": {{
       "score": <0-100>,
-      "weight": 0.10,
+      "weight": 0.083,
       "findings": [...]
     }},
     "risk_awareness": {{
       "score": <0-100>,
-      "weight": 0.10,
+      "weight": 0.083,
       "findings": [...]
     }},
     "granularity": {{
       "score": <0-100>,
-      "weight": 0.10,
+      "weight": 0.083,
       "findings": [...]
     }},
     "priority_alignment": {{
       "score": <0-100>,
-      "weight": 0.05,
+      "weight": 0.042,
       "findings": [...]
     }},
     "environment_compatibility": {{
       "score": <0-100>,
-      "weight": 0.15,
-      "findings": ["<tool> detected (version X)", "Item '<id>' requires <tool> (not detected)", ...],
+      "weight": 0.125,
+      "findings": ["<tool> detected (version X)", "Item requires <tool> (not detected, requires sudo)", ...],
       "missing_tools": ["<tool1>", "<tool2>"],
-      "available_tools": ["<tool1>", "<tool2>"]
+      "available_tools": ["<tool1>", "<tool2>"],
+      "requires_sudo": ["<tool1>", "<tool2>"]
+    }},
+    "architecture_quality": {{
+      "score": <0-100>,
+      "weight": 0.083,
+      "findings": ["<finding 1>", "<finding 2>", ...],
+      "missing_sections": ["<section1>", "<section2>"]
     }},
     "agent_capability_alignment": {{
       "score": <0-100>,
-      "weight": 0.05,
+      "weight": 0.042,
       "findings": ["<finding 1>", "<finding 2>", ...],
       "permission_flags": {{
         "requires_network": <true|false>,
@@ -178,6 +261,14 @@ Write a JSON file with this exact structure:
         "requires_system_admin": <true|false>,
         "requires_external_services": <true|false>
       }}
+    }},
+    "backlog_architecture_alignment": {{
+      "score": <0-100>,
+      "weight": 0.083,
+      "findings": ["<finding 1>", "<finding 2>", ...],
+      "misalignments": [
+        {{"issue": "<description>", "backlog_item": "<id or null>", "architecture_section": "<section or null>"}}
+      ]
     }}
   }},
   "overall_score": <weighted average>,
@@ -196,7 +287,7 @@ Write a JSON file with this exact structure:
     "<actionable recommendation 2>",
     ...
   ],
-  "follow_up_prompt": "<detailed prompt for improving the backlog>"
+  "follow_up_prompt": "<detailed prompt for improving the backlog and/or architecture>"
 }}
 
 # Guidelines
@@ -204,11 +295,13 @@ Write a JSON file with this exact structure:
 - Be thorough but fair in your assessment
 - Provide specific, actionable findings for each metric
 - Reference specific item IDs in issues and recommendations
-- Calculate overall_score as weighted average: clarity*0.15 + completeness*0.10 + automation*0.20 + dependencies*0.10 + risks*0.10 + granularity*0.10 + priority*0.05 + environment*0.15 + capability*0.05
-- Set ready_for_auto to true if overall_score >= 75
+- Calculate overall_score as weighted average using the weights above
+- Set ready_for_auto to true if overall_score >= threshold
 - Make follow_up_prompt detailed and actionable
-- For environment_compatibility: actually run bash commands to check for tools
-- For agent_capability_alignment: analyze operations and set permission flags accurately
+- For environment_compatibility: actually run bash commands to check for tools from ARCHITECTURE.md
+- For abstraction_level: be strict - flag any implementation details
+- For architecture_quality: read and evaluate docs/ARCHITECTURE.md thoroughly
+- For backlog_architecture_alignment: check for contradictions and gaps
 - Use the write_file tool to create the JSON file
 
 Generate the analysis and write it to the file now.

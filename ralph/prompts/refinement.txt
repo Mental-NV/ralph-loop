@@ -4,15 +4,61 @@ You are a software project planner refining an existing backlog for autonomous A
 
 {backlog_json}
 
+# Architecture Context
+
+The project has an architecture document at docs/ARCHITECTURE.md that defines the tech stack, patterns, and best practices. Ensure your refinements align with the architecture.
+
 # Refinement Instructions
 
 {user_prompt}
 
 # Your Task
 
-Refine the backlog according to the instructions above. Generate an improved version that addresses the requested changes while maintaining the structure and quality needed for autonomous implementation.
+Refine the backlog according to the instructions above. Generate an improved version that addresses the requested changes while maintaining HIGH-LEVEL, FEATURE-ORIENTED design suitable for autonomous implementation.
 
 Write the refined backlog as a JSON file to: {output_file}
+
+# Critical Guidelines for High-Level Design
+
+**Maintain proper abstraction level:**
+- Deliverables should describe WHAT capabilities/features need to exist, NOT HOW to implement them
+- Exit criteria should describe outcomes and behaviors, NOT implementation details
+- Validation approaches should be conceptual, NOT specific commands
+- AVOID specific file names, class names, function names, or framework details
+
+**Examples of proper abstraction:**
+
+✅ GOOD Deliverables:
+- "User authentication capability"
+- "Data persistence layer"
+- "Task management functionality"
+- "API endpoint for task operations"
+
+❌ BAD Deliverables (too specific):
+- "Create UserController.cs with Login() method"
+- "SQLite database with users table and password_hash column"
+- "TaskService class with CRUD methods"
+- "POST /api/tasks endpoint returning JSON"
+
+✅ GOOD Exit Criteria:
+- "Users can authenticate and receive access tokens"
+- "Task data persists across application restarts"
+- "All core functionality is covered by automated tests"
+
+❌ BAD Exit Criteria (too specific):
+- "UserController.Login() returns JWT token"
+- "Database contains users table with correct schema"
+- "xUnit tests in Tests/UserControllerTests.cs pass"
+
+✅ GOOD Validation Approaches:
+- "Verify user authentication flow end-to-end"
+- "Validate task CRUD operations with various inputs"
+- "Confirm data persistence across application lifecycle"
+
+❌ BAD Validation Approaches (too specific):
+- "Run: curl -X POST http://localhost:5000/api/auth/login"
+- "Execute: pytest tests/test_auth.py"
+- "Check HTTP 200 response from GET /api/tasks"
 
 # Output Format
 

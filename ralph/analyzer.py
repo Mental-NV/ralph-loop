@@ -81,6 +81,14 @@ class BacklogAnalyzer:
         print(f"Analyzing backlog: {self.backlog_path}", file=sys.stderr)
         print(f"Provider: {self.provider_name}", file=sys.stderr)
         print(f"Project directory: {self.project_dir}", file=sys.stderr)
+
+        # Check for ARCHITECTURE.md
+        arch_path = self.project_dir / "docs" / "ARCHITECTURE.md"
+        if arch_path.exists():
+            print(f"Architecture document: {arch_path}", file=sys.stderr)
+        else:
+            print(f"Warning: No ARCHITECTURE.md found at {arch_path}", file=sys.stderr)
+
         print(file=sys.stderr)
 
         # Ensure debug directory exists

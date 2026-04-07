@@ -109,6 +109,21 @@ def handle_refine(args):
     return refiner.refine(args.prompt)
 
 
+def handle_refine_architecture(args):
+    """Handle 'ralph refine-architecture PROMPT' command."""
+    from ralph.architecture_refiner import ArchitectureRefiner
+
+    project_dir = resolve_project_dir(args)
+
+    refiner = ArchitectureRefiner(
+        project_dir=project_dir,
+        provider=args.provider,
+        dry_run=args.dry_run
+    )
+
+    return refiner.refine(args.prompt)
+
+
 def handle_improve(args):
     """Handle 'ralph improve' command."""
     from ralph.improver import BacklogImprover
@@ -444,6 +459,13 @@ YOLO mode (auto-approve all actions) is always enabled.
     )
     refine_parser.add_argument('prompt', type=str, help='Refinement instructions')
 
+    # ralph refine-architecture
+    refine_arch_parser = subparsers.add_parser(
+        'refine-architecture',
+        help='Refine architecture document using AI agent. Usage: ralph refine-architecture PROMPT'
+    )
+    refine_arch_parser.add_argument('prompt', type=str, help='Architecture refinement instructions')
+
     # ralph improve
     improve_parser = subparsers.add_parser(
         'improve',
@@ -540,6 +562,7 @@ YOLO mode (auto-approve all actions) is always enabled.
             'doctor': handle_doctor,
             'analyze': handle_analyze,
             'refine': handle_refine,
+            'refine-architecture': handle_refine_architecture,
             'improve': handle_improve,
             'validate': handle_validate,
             'list-providers': handle_list_providers,

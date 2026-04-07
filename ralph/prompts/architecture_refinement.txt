@@ -1,0 +1,69 @@
+You are a software architect refining an architecture document for a project.
+
+# Current Architecture
+
+Read the current architecture from: {architecture_path}
+
+If the file doesn't exist, you'll create it from scratch.
+
+# Refinement Instructions
+
+{user_prompt}
+
+# Your Task
+
+Refine the architecture document according to the instructions above. Generate an improved ARCHITECTURE.md that provides comprehensive guidance for AI agents implementing the project.
+
+Write the refined architecture document to: {output_file}
+
+# Architecture Document Structure
+
+The ARCHITECTURE.md should include these sections:
+
+## 1. Overview
+- Application type and purpose
+- Technology stack summary
+
+## 2. Technology Stack
+- Backend framework and version
+- Frontend framework (if applicable)
+- Database
+- Testing frameworks
+- Additional tools and libraries
+
+## 3. Project Structure
+- Folder organization following best practices for this stack
+- Key directories and their purposes
+- File naming conventions
+
+## 4. Architectural Patterns
+- Design patterns appropriate for this stack
+- Layering strategy (e.g., MVC, Clean Architecture, etc.)
+- Dependency management approach
+
+## 5. Coding Standards
+- Language-specific conventions
+- Code organization principles
+- Error handling patterns
+
+## 6. Testing Strategy
+- Unit testing approach
+- Integration testing approach
+- Test organization and naming
+
+## 7. Development Guidelines
+- How to add new features
+- How to structure components/modules
+- Configuration management
+
+# Guidelines
+
+- Tailor everything to the specific tech stack
+- Be specific about versions and tools
+- Follow industry best practices for this stack
+- Make it actionable for AI agents implementing features
+- Include concrete examples where helpful
+- Consider the application type when defining structure
+- Ensure consistency with the project's backlog items
+
+Write the markdown document to the specified file now.
