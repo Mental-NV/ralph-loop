@@ -115,7 +115,7 @@ ralph analyze --save-analysis
 ralph validate
 
 # Show next item to be executed
-ralph show-next
+ralph item show-next
 
 # List available providers
 ralph list-providers
@@ -140,9 +140,9 @@ ralph run --continue-on-error
 ralph --backlog /path/to/custom-backlog.json run
 
 # Manual override commands (for stuck items)
-ralph mark-complete ITEM-ID      # Mark item as done (bypasses validation)
-ralph mark-ready ITEM-ID         # Mark item as ready for validation
-ralph reset-item ITEM-ID         # Reset item back to todo status
+ralph item mark-complete ITEM-ID      # Mark item as done (bypasses validation)
+ralph item mark-ready ITEM-ID         # Mark item as ready for validation
+ralph item reset ITEM-ID              # Reset item back to todo status
 
 # Run health checks
 ralph doctor

@@ -347,10 +347,12 @@ Examples:
   ralph analyze --save-analysis
   ralph improve --threshold 80
   ralph doctor
-  ralph mark-complete ITEM-1
+  ralph item show-next
+  ralph item mark-complete ITEM-1
 
 For detailed help on a specific command:
   ralph COMMAND --help
+  ralph item --help
 
 YOLO mode (auto-approve all actions) is always enabled.
 """,
@@ -465,32 +467,42 @@ YOLO mode (auto-approve all actions) is always enabled.
     # ralph validate
     subparsers.add_parser('validate', help='Validate backlog.json and exit')
 
-    # ralph show-next
-    subparsers.add_parser('show-next', help='Show next item that would be executed and exit')
+    # ralph item (group for item management commands)
+    item_parser = subparsers.add_parser(
+        'item',
+        help='Manage backlog items (show-next, mark-complete, mark-ready, reset)'
+    )
+    item_subparsers = item_parser.add_subparsers(dest='item_command', help='Item operations')
+
+    # ralph item show-next
+    item_subparsers.add_parser(
+        'show-next',
+        help='Show next item that would be executed'
+    )
+
+    # ralph item mark-complete
+    item_mark_complete_parser = item_subparsers.add_parser(
+        'mark-complete',
+        help='Mark an item as complete (bypasses validation)'
+    )
+    item_mark_complete_parser.add_argument('item_id', type=str, metavar='ITEM_ID', help='Item ID to mark as complete')
+
+    # ralph item mark-ready
+    item_mark_ready_parser = item_subparsers.add_parser(
+        'mark-ready',
+        help='Mark an item as ready for validation'
+    )
+    item_mark_ready_parser.add_argument('item_id', type=str, metavar='ITEM_ID', help='Item ID to mark as ready')
+
+    # ralph item reset
+    item_reset_parser = item_subparsers.add_parser(
+        'reset',
+        help='Reset an item back to todo status'
+    )
+    item_reset_parser.add_argument('item_id', type=str, metavar='ITEM_ID', help='Item ID to reset')
 
     # ralph list-providers
     subparsers.add_parser('list-providers', help='List available providers and exit')
-
-    # ralph mark-complete
-    mark_complete_parser = subparsers.add_parser(
-        'mark-complete',
-        help='Manually mark an item as complete (bypasses validation). Usage: ralph mark-complete ITEM_ID'
-    )
-    mark_complete_parser.add_argument('item_id', type=str, metavar='ITEM_ID', help='Item ID to mark as complete')
-
-    # ralph mark-ready
-    mark_ready_parser = subparsers.add_parser(
-        'mark-ready',
-        help='Manually mark an item as ready for validation. Usage: ralph mark-ready ITEM_ID'
-    )
-    mark_ready_parser.add_argument('item_id', type=str, metavar='ITEM_ID', help='Item ID to mark as ready')
-
-    # ralph reset-item
-    reset_item_parser = subparsers.add_parser(
-        'reset-item',
-        help='Reset an item back to todo status. Usage: ralph reset-item ITEM_ID'
-    )
-    reset_item_parser.add_argument('item_id', type=str, metavar='ITEM_ID', help='Item ID to reset')
 
     args = parser.parse_args()
 
@@ -506,22 +518,34 @@ YOLO mode (auto-approve all actions) is always enabled.
             args.continue_on_error = False
 
     # Dispatch to handlers
-    handlers = {
-        'run': handle_run,
-        'init': handle_init,
-        'doctor': handle_doctor,
-        'analyze': handle_analyze,
-        'refine': handle_refine,
-        'improve': handle_improve,
-        'validate': handle_validate,
-        'show-next': handle_show_next,
-        'list-providers': handle_list_providers,
-        'mark-complete': handle_mark_complete,
-        'mark-ready': handle_mark_ready,
-        'reset-item': handle_reset_item,
-    }
+    if args.command == 'item':
+        # Handle item subcommands
+        if not hasattr(args, 'item_command') or args.item_command is None:
+            print("Error: 'ralph item' requires a subcommand", file=sys.stderr)
+            print("Run 'ralph item --help' for available commands", file=sys.stderr)
+            sys.exit(1)
 
-    exit_code = handlers[args.command](args)
+        item_handlers = {
+            'show-next': handle_show_next,
+            'mark-complete': handle_mark_complete,
+            'mark-ready': handle_mark_ready,
+            'reset': handle_reset_item,
+        }
+        exit_code = item_handlers[args.item_command](args)
+    else:
+        # Handle top-level commands
+        handlers = {
+            'run': handle_run,
+            'init': handle_init,
+            'doctor': handle_doctor,
+            'analyze': handle_analyze,
+            'refine': handle_refine,
+            'improve': handle_improve,
+            'validate': handle_validate,
+            'list-providers': handle_list_providers,
+        }
+        exit_code = handlers[args.command](args)
+
     sys.exit(exit_code)
 
 

@@ -60,13 +60,13 @@ If an item gets stuck, use manual override commands:
 
 ```bash
 # Item stuck in in_progress after agent crash
-ralph mark-ready ITEM-ID
+ralph item mark-ready ITEM-ID
 
 # Item stuck in ready_for_validation, but work is actually done
-ralph mark-complete ITEM-ID
+ralph item mark-complete ITEM-ID
 
 # Need to re-run an item from scratch
-ralph reset-item ITEM-ID
+ralph item reset ITEM-ID
 ```
 
 ---
