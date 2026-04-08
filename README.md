@@ -6,8 +6,9 @@ Ralph Loop is a standalone tool that executes backlog items autonomously using A
 
 ## Features
 
-- **Backlog initialization**: Generate backlog from natural language prompts using AI
-- **Backlog analysis**: Evaluate backlog readiness for autonomous execution with 9-metric assessment
+- **Backlog initialization**: Generate high-level, feature-oriented backlog from natural language prompts using AI
+- **Architecture document generation**: Automatically create `docs/ARCHITECTURE.md` with tech stack and best practices
+- **Backlog analysis**: Evaluate backlog readiness for autonomous execution with 11-metric assessment
 - **Multi-provider support**: Qwen (local), Claude Code (CLI), Codex (API)
 - **JSON-driven orchestration**: Backlog items defined in `docs/backlog.json`
 - **Automatic validation**: Schema validation and semantic checks before execution
@@ -18,6 +19,7 @@ Ralph Loop is a standalone tool that executes backlog items autonomously using A
 - **Resilient execution**: Multi-phase execution with graceful cleanup handling
 - **Manual overrides**: Commands to manually manage stuck items
 - **Backlog refinement**: Iteratively improve backlog using AI agent suggestions
+- **Architecture refinement**: Refine architecture document with `ralph refine-architecture`
 
 For advanced topics like resilient execution, error handling, and health checks, see the [Advanced Guide](docs/ADVANCED.md).
 
@@ -56,10 +58,11 @@ ralph init "Build a web scraper in Python that extracts article titles from news
 ```
 
 This will:
-1. Invoke an AI agent to generate a comprehensive roadmap
-2. Create `docs/backlog.json` with structured milestones
-3. Validate the generated backlog
-4. Display a summary of milestones
+1. Detect or recommend appropriate tech stack for your project
+2. Generate `docs/ARCHITECTURE.md` with tech stack, patterns, and best practices
+3. Generate high-level, feature-oriented `docs/backlog.json` with structured milestones
+4. Validate the generated backlog
+5. Display a summary of milestones
 
 Then run Ralph Loop to execute the backlog:
 
@@ -237,7 +240,13 @@ The `docs/backlog.json` file defines milestones and their execution order:
           "description": "Tests pass",
           "done": false
         }
-      ]
+      ],
+      "validation": {
+        "commands": [
+          "Verify development environment can be set up from scratch",
+          "Confirm all essential project files are present"
+        ]
+      }
     }
   ]
 }
@@ -392,9 +401,15 @@ The `ralph init` command generates a comprehensive project roadmap from a natura
 
 1. You provide a project description
 2. Ralph Loop invokes an AI agent (Qwen, Claude Code, or Codex)
-3. The agent generates a roadmap with milestones, deliverables, and exit criteria
-4. Ralph Loop transforms the response into a valid `backlog.json`
-5. The backlog is validated and saved to `docs/backlog.json`
+3. The agent detects or recommends appropriate tech stack based on your description
+4. The agent generates `docs/ARCHITECTURE.md` with:
+   - Technology stack and versions
+   - Project structure and patterns
+   - Coding standards
+   - Testing strategy
+5. The agent generates a high-level, feature-oriented roadmap
+6. Ralph Loop transforms the response into a valid `backlog.json`
+7. The backlog is validated and saved to `docs/backlog.json`
 
 ### Usage examples
 
@@ -438,15 +453,32 @@ ralph init "Build a calculator app" --dry-run
 
 ### What gets generated
 
+#### docs/backlog.json
 Each milestone includes:
 - **Title**: Clear, actionable milestone name
 - **Why**: Rationale for the milestone
 - **Priority**: P0 (foundation), P1 (core), P2 (enhancements), P3 (polish)
 - **Dependencies**: Which milestones must complete first
-- **Deliverables**: Concrete outputs (files, functions, tests)
-- **Exit Criteria**: How to verify completion
+- **Deliverables**: High-level capabilities and features (NOT specific files or classes)
+- **Exit Criteria**: Outcome-based verification (NOT implementation details)
 - **Risks**: Potential challenges and mitigations
-- **Validation Commands**: Shell commands to verify the milestone
+- **Validation Approach**: Conceptual validation strategies (NOT specific commands)
+
+**Important:** Backlogs are now **high-level and feature-oriented**:
+- ✅ "User authentication capability" (not "Create UserController.cs")
+- ✅ "Data persistence layer" (not "SQLite database with users table")
+- ✅ "Verify authentication flow end-to-end" (not "Run: curl http://localhost:5000")
+
+#### docs/ARCHITECTURE.md
+The architecture document provides technical guidance:
+- **Technology Stack**: Specific versions and tools
+- **Project Structure**: Folder organization and naming conventions
+- **Architectural Patterns**: Design patterns for this stack
+- **Coding Standards**: Language-specific conventions
+- **Testing Strategy**: Unit, integration, and e2e testing approach
+- **Development Guidelines**: How to add features and structure code
+
+Agents use ARCHITECTURE.md to make implementation decisions while following the high-level backlog.
 
 ### Customizing generated backlogs
 
@@ -474,29 +506,39 @@ This helps troubleshoot issues with agent responses or parsing.
 
 ## Backlog Analysis with `ralph analyze`
 
-The `ralph analyze` command evaluates whether a backlog is suitable for full-auto long-running execution. It uses AI agents to assess the backlog across 9 dimensions and provides actionable recommendations for improvement.
+The `ralph analyze` command evaluates whether a backlog is suitable for full-auto long-running execution. It uses AI agents to assess the backlog across 11 dimensions and provides actionable recommendations for improvement.
 
 ### How it works
 
 1. Loads and validates the backlog.json
-2. Invokes an AI agent with the backlog content and project directory path
-3. Agent dynamically assesses environment compatibility and agent capabilities
-4. Returns structured JSON with metrics, scores, issues, and recommendations
-5. Optionally saves analysis to `.ralph/backlog-analysis.json`
+2. Reads and evaluates docs/ARCHITECTURE.md (if present)
+3. Invokes an AI agent with the backlog content, architecture, and project directory path
+4. Agent dynamically assesses environment compatibility and agent capabilities
+5. Returns structured JSON with metrics, scores, issues, and recommendations
+6. Optionally saves analysis to `.ralph/backlog-analysis.json`
 
-### Nine-Metric Evaluation Framework
+### Eleven-Metric Evaluation Framework
 
-1. **Clarity (15% weight)** - Clear titles, why statements, deliverables, exit criteria
-2. **Completeness (10% weight)** - All required fields, adequate deliverables/criteria
-3. **Automation-Readiness (20% weight)** - Executable validation commands, verifiable deliverables
-4. **Dependency Structure (10% weight)** - Well-defined dependencies, parallelization opportunities
-5. **Risk Awareness (10% weight)** - Risks identified with mitigation strategies
-6. **Granularity (10% weight)** - Appropriately sized items (5-15 total)
-7. **Priority Alignment (5% weight)** - P0=foundation, P1=core, P2=enhancements, P3=polish
-8. **Environment Compatibility (15% weight)** - Tech stack requirements match available tools/runtimes
-9. **Agent Capability Alignment (5% weight)** - Tasks within AI agent's operational permissions
+1. **Clarity (12.5% weight)** - Clear titles, why statements, deliverables, exit criteria
+2. **Completeness (8.3% weight)** - All required fields, adequate deliverables/criteria
+3. **Abstraction Level (16.7% weight)** - High-level capabilities vs implementation details
+4. **Dependency Structure (8.3% weight)** - Well-defined dependencies, parallelization opportunities
+5. **Risk Awareness (8.3% weight)** - Risks identified with mitigation strategies
+6. **Granularity (8.3% weight)** - Appropriately sized items (5-15 total)
+7. **Priority Alignment (4.2% weight)** - P0=foundation, P1=core, P2=enhancements, P3=polish
+8. **Environment Compatibility (12.5% weight)** - Required tools from ARCHITECTURE.md are available
+9. **Architecture Quality (8.3% weight)** - ARCHITECTURE.md is comprehensive and actionable
+10. **Agent Capability Alignment (4.2% weight)** - Tasks within AI agent's operational permissions
+11. **Backlog-Architecture Alignment (8.3% weight)** - Backlog and architecture are consistent
 
 **Overall Score:** Weighted average with 75/100 threshold for "ready for auto"
+
+**Key Metrics Explained:**
+
+- **Abstraction Level**: Ensures deliverables are high-level (e.g., "User authentication capability") not implementation-specific (e.g., "Create UserController.cs")
+- **Environment Compatibility**: Checks if tools specified in ARCHITECTURE.md are installed, flags tools requiring sudo (Playwright, PostgreSQL, Docker)
+- **Architecture Quality**: Evaluates if ARCHITECTURE.md exists and contains tech stack, patterns, standards, testing strategy
+- **Backlog-Architecture Alignment**: Validates consistency between backlog items and architecture (no contradictions or gaps)
 
 ### Usage examples
 
@@ -552,29 +594,33 @@ The analysis returns structured JSON with:
 - `version`: Schema version
 - `analyzed_at`: Timestamp
 - `backlog_path`: Path to analyzed backlog
-- `tech_stack_detected`: Detected technologies (backend, database, tests, frontend)
+- `architecture_path`: Path to ARCHITECTURE.md (or null if missing)
+- `architecture_exists`: Boolean indicating if ARCHITECTURE.md exists
+- `tech_stack_from_architecture`: Tech stack parsed from ARCHITECTURE.md
 - `summary`: Item counts by priority and status
-- `metrics`: 9 metrics with scores (0-100), weights, and findings
+- `metrics`: 11 metrics with scores (0-100), weights, and findings
 - `overall_score`: Weighted average
 - `threshold`: Readiness threshold (75)
 - `ready_for_auto`: Boolean decision
 - `issues`: Structured list of problems (severity, category, item_id, message)
 - `recommendations`: Actionable improvement suggestions
-- `follow_up_prompt`: Detailed prompt for improving the backlog
+- `follow_up_prompt`: Detailed prompt for improving the backlog and/or architecture
 
 ### Environment compatibility assessment
 
-The agent dynamically checks for required tools by:
-1. Parsing backlog items to identify tech stack requirements
-2. Running bash commands to check for tools (e.g., `dotnet --version`, `node --version`)
-3. Comparing requirements vs. availability
-4. Reporting missing tools with specific item IDs
+The agent checks for required tools by:
+1. Reading `docs/ARCHITECTURE.md` to identify tech stack requirements
+2. Running bash commands to check if tools are installed (e.g., `dotnet --version`, `node --version`)
+3. Flagging tools that require sudo/admin privileges (Playwright, PostgreSQL, Docker)
+4. Comparing requirements vs. availability
+5. Reporting missing tools that would block implementation
 
 Example for .NET + React stack:
-- Detects ".NET 10 SDK" if backlog mentions ASP.NET Core
-- Detects "Node.js" if backlog mentions React/Vite
+- Reads ARCHITECTURE.md to find ".NET 10" and "React + TypeScript + Vite"
+- Checks for .NET SDK via `dotnet --version`
+- Checks for Node.js via `node --version`
 - Checks for xUnit via `dotnet test --help`
-- Checks for Vitest via package.json or `npm list vitest`
+- Flags if Playwright is required but not installed (requires sudo for browser install)
 
 ### Agent capability assessment
 
@@ -591,6 +637,92 @@ These flags enable automated decision-making in CI/CD pipelines.
 Analysis attempts save debug information to `logs/ralph/analyze/`:
 - `analysis-*.json`: The temp output file from the agent
 - `failed-analysis-parse-*.txt`: Responses that failed to parse (if any)
+
+### Architecture Refinement
+
+Use `ralph refine-architecture` to improve the architecture document:
+
+```bash
+# Refine architecture with specific instructions
+ralph refine-architecture "Add more detail about error handling patterns"
+
+# Update tech stack
+ralph refine-architecture "Switch from SQLite to PostgreSQL"
+
+# Add missing sections
+ralph refine-architecture "Add section about API versioning strategy"
+```
+
+The command:
+1. Reads current `docs/ARCHITECTURE.md`
+2. Applies your refinement instructions
+3. Creates a backup before modifying
+4. Saves the improved architecture document
+
+Use this when:
+- Tech stack changes during development
+- More architectural detail is needed
+- Best practices need to be updated
+- New patterns or guidelines should be added
+
+## High-Level Design Philosophy
+
+Ralph Loop uses a **high-level, feature-oriented** approach to backlog design. This paradigm shift enables better flexibility and adaptability during autonomous implementation.
+
+### The Paradigm
+
+**Backlogs describe WHAT, not HOW:**
+- Focus on capabilities and outcomes
+- Avoid implementation details
+- Let AI agents make technical decisions based on ARCHITECTURE.md
+
+**ARCHITECTURE.md provides technical guidance:**
+- Specifies tech stack, patterns, and best practices
+- Guides implementation decisions
+- Ensures consistency across the project
+
+### Examples of Proper Abstraction
+
+**Deliverables:**
+- ✅ GOOD: "User authentication capability"
+- ❌ BAD: "Create UserController.cs with Login() method"
+- ✅ GOOD: "Data persistence layer"
+- ❌ BAD: "SQLite database with users table and password_hash column"
+- ✅ GOOD: "Task management functionality"
+- ❌ BAD: "TaskService class with CRUD methods"
+
+**Exit Criteria:**
+- ✅ GOOD: "Users can authenticate and receive access tokens"
+- ❌ BAD: "UserController.Login() returns JWT token"
+- ✅ GOOD: "Task data persists across application restarts"
+- ❌ BAD: "Database contains tasks table with correct schema"
+- ✅ GOOD: "All core functionality is covered by automated tests"
+- ❌ BAD: "xUnit tests in Tests/UserControllerTests.cs pass"
+
+**Validation Approaches:**
+- ✅ GOOD: "Verify user authentication flow end-to-end"
+- ❌ BAD: "Run: curl -X POST http://localhost:5000/api/auth/login"
+- ✅ GOOD: "Validate task CRUD operations with various inputs"
+- ❌ BAD: "Execute: pytest tests/test_tasks.py"
+- ✅ GOOD: "Confirm data persistence across application lifecycle"
+- ❌ BAD: "Check HTTP 200 response from GET /api/tasks"
+
+### Why High-Level Design?
+
+1. **Flexibility**: Agents can choose appropriate tools and approaches
+2. **Adaptability**: Implementation changes don't cascade through backlog
+3. **Future-proof**: High-level descriptions remain valid as tools evolve
+4. **Better AI decisions**: Agents use ARCHITECTURE.md to make informed choices
+5. **Easier maintenance**: Fewer brittle dependencies on specific implementations
+
+### How Agents Use Both Documents
+
+1. **Read backlog item**: Understand WHAT capability is needed
+2. **Read ARCHITECTURE.md**: Understand HOW to implement (tech stack, patterns)
+3. **Implement**: Create code following architectural guidelines
+4. **Validate**: Verify the outcome matches exit criteria
+
+This separation of concerns allows for better autonomous implementation while maintaining architectural consistency.
 
 ## Troubleshooting
 

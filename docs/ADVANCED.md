@@ -28,31 +28,37 @@ Ralph Loop uses multi-phase execution to handle transient failures gracefully:
 
 ### Graceful Cleanup Handling
 
-Validation commands are classified as either **critical** or **cleanup**:
+Validation approaches in Ralph Loop are **conceptual and high-level**. Agents interpret these approaches and choose appropriate tools based on `docs/ARCHITECTURE.md`.
 
-- **Critical commands**: Must pass for validation to succeed (e.g., `dotnet test`, `pytest`)
-- **Cleanup commands**: Best-effort, failures don't block completion (e.g., `pkill`, `docker stop`)
-
-Cleanup commands are automatically detected by pattern matching:
-- `pkill`, `killall`, `kill`
-- `docker stop`, `docker rm`
-- `npm stop`, `dotnet stop`
-- `rm -rf`
-
-Example validation with cleanup:
+**Example validation approaches:**
 ```json
 {
   "validation": {
     "commands": [
-      "dotnet test",              // Critical - must pass
-      "curl http://localhost:5000", // Critical - must pass
-      "pkill -f 'dotnet run'"     // Cleanup - failure is non-blocking
+      "Verify all unit tests pass",
+      "Confirm API endpoints respond correctly",
+      "Validate application can be stopped cleanly"
     ]
   }
 }
 ```
 
-If the cleanup command fails (e.g., process already stopped), the item is still marked as done.
+**How agents interpret these:**
+- "Verify all unit tests pass" → Agent runs `dotnet test` or `pytest` based on ARCHITECTURE.md
+- "Confirm API endpoints respond correctly" → Agent uses appropriate testing tool (curl, Playwright, etc.)
+- "Validate application can be stopped cleanly" → Agent attempts graceful shutdown (best-effort)
+
+Validation approaches are classified as either **critical** or **cleanup**:
+
+- **Critical approaches**: Must succeed for validation to pass (e.g., "Verify tests pass", "Confirm API responds")
+- **Cleanup approaches**: Best-effort, failures don't block completion (e.g., "Stop running processes", "Clean up temporary files")
+
+Cleanup approaches are automatically detected by pattern matching:
+- "stop", "kill", "terminate" (process cleanup)
+- "clean up", "remove temporary", "delete temp" (file cleanup)
+- "shut down", "close" (service cleanup)
+
+If a cleanup approach fails (e.g., process already stopped), the item is still marked as done.
 
 ### Manual Recovery
 
