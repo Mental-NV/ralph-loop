@@ -280,11 +280,134 @@ def get_provider(name: str) -> AgentProvider:
         "codex": CodexProvider(),
     }
 
+    # Support mock provider for testing
+    if name.lower() == "mock":
+        import os
+        # Only allow mock provider in test mode
+        if os.environ.get('RALPH_TEST_MODE') == '1':
+            try:
+                from tests.helpers.mock_provider import MockAgentProvider
+                return MockAgentProvider()
+            except ImportError:
+                # Fallback: create mock provider without test infrastructure
+                return _create_env_mock_provider()
+        else:
+            raise ValueError(
+                "Mock provider requires RALPH_TEST_MODE=1 environment variable. "
+                "This provider is only available during testing."
+            )
+
     provider = providers.get(name.lower())
     if not provider:
         raise ValueError(f"Unknown provider: {name}. Available: {', '.join(providers.keys())}")
 
     return provider
+
+
+def _create_env_mock_provider():
+    """
+    Create a minimal mock provider that reads from environment variables.
+
+    This is a fallback when tests/ module is not available in subprocess.
+    """
+    import json
+    import os
+    import sys
+    from pathlib import Path
+    from typing import List, Optional, Tuple
+
+    class EnvMockProvider(AgentProvider):
+        """Mock provider that reads responses from environment variables."""
+
+        def __init__(self):
+            env_responses = os.environ.get('RALPH_MOCK_RESPONSES', '{}')
+            response_data = json.loads(env_responses)
+
+            # Check if this is a multi-response dict (has numeric string keys like "0", "1", "2")
+            if isinstance(response_data, dict):
+                # Try to detect if keys are numeric strings (from JSON serialization of int keys)
+                keys = list(response_data.keys())
+                if keys and all(k.isdigit() for k in keys if isinstance(k, str)):
+                    # Convert string keys back to integers
+                    self.responses = {int(k): v for k, v in response_data.items()}
+                    self._single_response = False
+                else:
+                    # Single response dict - use for all calls
+                    self.responses = {0: response_data}
+                    self._single_response = True
+            else:
+                self.responses = {0: response_data}
+                self._single_response = True
+
+            self.call_count = 0
+
+        def get_name(self) -> str:
+            return "mock"
+
+        def is_available(self) -> bool:
+            return True
+
+        def build_command(self, prompt: str, project_dir: Path, yolo: bool = False) -> List[str]:
+            if self._single_response:
+                response = self.responses.get(0, {})
+            else:
+                response = self.responses.get(self.call_count, {})
+
+            # If no response configured, provide a minimal valid default
+            if not response:
+                response = {"version": "1.0.0", "items": []}
+
+            self.call_count += 1
+
+            # Check if prompt asks to write to a file
+            import re
+            file_match = re.search(r'write.*?to[:\s]+[`"]?([^`"\n]+\.(?:json|md))[`"]?', prompt, re.IGNORECASE)
+
+            if file_match:
+                # Extract the file path and write the response to it
+                output_file = file_match.group(1)
+                response_json = json.dumps(response, indent=2)
+                write_cmd = f"""
+import json
+from pathlib import Path
+
+output_file = Path({repr(output_file)})
+output_file.parent.mkdir(parents=True, exist_ok=True)
+
+response = {repr(response)}
+
+# Handle different response types
+if isinstance(response, dict):
+    if 'content' in response:
+        # Architecture document with content field
+        output_file.write_text(response['content'], encoding='utf-8')
+    else:
+        # JSON response
+        output_file.write_text(json.dumps(response, indent=2), encoding='utf-8')
+else:
+    output_file.write_text(str(response), encoding='utf-8')
+
+# Print the response wrapped in markdown
+print({repr(f"```json\n{response_json}\n```")})
+"""
+                return [sys.executable, "-c", write_cmd]
+            else:
+                # No file writing needed, just return the response
+                response_json = json.dumps(response, indent=2)
+                # Wrap in markdown code block as expected by parser
+                wrapped_response = f"```json\n{response_json}\n```"
+                return [sys.executable, "-c", f"print({repr(wrapped_response)})"]
+
+        def supports_rich_progress(self) -> bool:
+            return False
+
+        def get_progress_renderer(self, project_dir: Path) -> Optional[List[str]]:
+            return None
+
+        def check_authentication(self) -> Tuple[bool, str]:
+            return True, "Mock provider (env mode)"
+
+    return EnvMockProvider()
 
 
 def list_available_providers() -> List[str]:

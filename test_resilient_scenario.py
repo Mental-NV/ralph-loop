@@ -109,10 +109,9 @@ def test_cleanup_failure_scenario():
             print("  - Critical validation passed (tests)")
             print("  - Cleanup failed (pkill) but was non-blocking")
             print("  - Item marked as done with all checkboxes")
-            return True
         else:
             print("\n✗ FAILED: Validation failed (should not happen)")
-            return False
+            assert False, "Validation should have passed"
 
 if __name__ == "__main__":
     success = test_cleanup_failure_scenario()

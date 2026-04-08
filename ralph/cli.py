@@ -391,7 +391,7 @@ YOLO mode (auto-approve all actions) is always enabled.
         '--provider',
         type=str,
         default='qwen',
-        choices=['qwen', 'claude', 'codex'],
+        choices=['qwen', 'claude', 'codex', 'mock'],
         help='Agent provider to use (default: qwen)'
     )
     parser.add_argument(

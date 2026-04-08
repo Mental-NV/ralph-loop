@@ -169,7 +169,12 @@ class BacklogInitializer:
             print("\nGenerating architecture document...")
             from ralph.prompts import build_architecture_prompt
 
-            arch_output = self.project_dir / "docs" / "ARCHITECTURE.md"
+            if self.dry_run:
+                # In dry-run mode, use temp location
+                arch_output = self.debug_dir / f"ARCHITECTURE-{self._timestamp()}.md"
+            else:
+                arch_output = self.project_dir / "docs" / "ARCHITECTURE.md"
+
             arch_prompt = build_architecture_prompt(user_prompt, tech_stack, str(arch_output))
 
             # Save architecture prompt for debugging
@@ -178,8 +183,10 @@ class BacklogInitializer:
 
             arch_response = self._invoke_provider(arch_prompt, arch_output)
 
-            if arch_output.exists():
+            if not self.dry_run and arch_output.exists():
                 print(f"✓ Architecture document created at {arch_output}")
+            elif self.dry_run:
+                print(f"[DRY RUN] Would create architecture document at {self.project_dir / 'docs' / 'ARCHITECTURE.md'}")
             else:
                 print("Warning: Architecture document was not created")
 
@@ -240,21 +247,48 @@ class BacklogInitializer:
 
         if self.dry_run:
             print(f"[DRY RUN] Would run: {' '.join(cmd)}")
-            # Create mock file for dry-run
-            mock_data = {
-                "version": "1.0.0",
-                "items": [
-                    {
-                        "title": "Example Milestone",
-                        "why": "This is a dry-run example",
-                        "priority": "P1",
-                        "dependsOn": [],
-                        "deliverables": ["Example deliverable"],
-                        "exitCriteria": ["Example criterion"],
-                        "risks": []
-                    }
-                ]
-            }
+            # Create mock file for dry-run based on file type
+            if 'tech-stack' in str(temp_output) or 'tech_stack' in str(temp_output):
+                # Tech stack detection mock
+                mock_data = {
+                    "app_type": "webapp",
+                    "backend": "Python",
+                    "frontend": "React",
+                    "database": "SQLite",
+                    "testing": "pytest",
+                    "additional_tools": []
+                }
+            elif temp_output.suffix == '.md' or 'ARCHITECTURE' in str(temp_output):
+                # Architecture document mock
+                mock_data = "# Architecture\n\nThis is a dry-run architecture document.\n"
+                temp_output.parent.mkdir(parents=True, exist_ok=True)
+                temp_output.write_text(mock_data, encoding='utf-8')
+                return mock_data
+            else:
+                # Roadmap mock with proper schema
+                mock_data = {
+                    "version": "1.0.0",
+                    "items": [
+                        {
+                            "id": "dry-run-milestone-1",
+                            "title": "Example Milestone",
+                            "status": "todo",
+                            "priority": "P1",
+                            "order": 0,
+                            "why": "This is a dry-run example",
+                            "dependsOn": [],
+                            "deliverables": [
+                                {"id": "d1", "text": "Example deliverable", "done": False}
+                            ],
+                            "exitCriteria": [
+                                {"id": "e1", "text": "Example criterion", "done": False}
+                            ],
+                            "risks": ["None"],
+                            "validation": {"commands": []}
+                        }
+                    ]
+                }
+            temp_output.parent.mkdir(parents=True, exist_ok=True)
             temp_output.write_text(json.dumps(mock_data, indent=2), encoding='utf-8')
             return json.dumps(mock_data)
 
